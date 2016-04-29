@@ -135,7 +135,6 @@ namespace WinIOTPortExpando
                 //To Be implimented. Need to attempt to do a serial read from the register
                 return true;
             }
-
         }
     }
 }
