@@ -58,8 +58,8 @@ namespace WinIOTPortExpando
                 {
                     switch (this.currentstate[pin])
                     {
-                        case '0': { return true; }
-                        default: { return false; }
+                        case '0': { return false; }
+                        default: { return true; }
                     }
                 }
                 else
