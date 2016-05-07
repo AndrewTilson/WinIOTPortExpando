@@ -25,6 +25,7 @@ namespace WinIOTPortExpando
             private string currentstate; //store binary value of whats commited to the shift register
             private int NumberOfPins;
             private ThreadPoolTimer timer;
+
             public delegate void MyEventHandler(pinchange m);
             public event MyEventHandler OnChange;
 
@@ -45,7 +46,7 @@ namespace WinIOTPortExpando
                 this.currentstate = new string('1', NumberOfPins);
 
                 read();
-                this.timer = ThreadPoolTimer.CreatePeriodicTimer(Timer_tick, TimeSpan.FromMilliseconds(25));
+                this.timer = ThreadPoolTimer.CreatePeriodicTimer(Timer_tick, TimeSpan.FromMilliseconds(50));
             }
 
             private void Timer_tick(ThreadPoolTimer timer)
