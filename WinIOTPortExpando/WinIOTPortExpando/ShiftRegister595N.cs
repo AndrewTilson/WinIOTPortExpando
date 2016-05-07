@@ -15,10 +15,7 @@ namespace WinIOTPortExpando
     {
         public class Shift595N
         {
-            //private 
-            private PinOut PinSDI;     // Serial Data Input 22 14
-            private PinOut PinRCLK;    // Shift Register Clock 27 11
-            private PinOut PinSRCLK;   // Storage Register Clock 18 12
+            private PinOut PinSDI, PinRCLK, PinSRCLK;     // Serial Data Input 22 14, Shift Register Clock 27 11, Storage Register Clock 18 12
             private string currentstate; //store binary value of whats commited to the shift register
 
             public Shift595N(int SDIPin, int SRCLKPin, int CLKPin, int NumOfRegisters)
@@ -116,24 +113,6 @@ namespace WinIOTPortExpando
                 {
                     throw new ArgumentOutOfRangeException("Invalid pin number. Ensure that you instantiated with enough registers defined.");
                 }
-            }
-        }
-
-        public class Shift165N : Shift595N
-        {
-            public PinIn SerialReadPin;
-
-            public Shift165N(int SDIPin, int CLKPin, int SRCLKPin, int SerialReadPin, int NumOfRegisters) : base(SDIPin, CLKPin, SRCLKPin, NumOfRegisters)
-            {
-                Shift165N Shift595N = new Shift165N(SDIPin, CLKPin, SRCLKPin, SerialReadPin, NumOfRegisters);
-
-                PinIn SerialRead = new PinIn(SerialReadPin);
-            }
-
-            public override bool getPinState(int pin)
-            {
-                //To Be implimented. Need to attempt to do a serial read from the register
-                return true;
             }
         }
     }

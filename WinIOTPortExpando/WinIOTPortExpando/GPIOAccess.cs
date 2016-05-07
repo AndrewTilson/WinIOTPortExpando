@@ -32,7 +32,7 @@ namespace WinIOTPortExpando
                     this.GpioPin = gpio.OpenPin(this.Device_PIN);
                     
                     //Default pin to off
-                    this.GpioPin.Write(GpioPinValue.High);
+                    this.putEnabled(false);
                     this.GpioPin.SetDriveMode(GpioPinDriveMode.Output);
                 }
                 catch (Exception)
@@ -91,8 +91,6 @@ namespace WinIOTPortExpando
                     this.GpioPin.SetDriveMode(GpioPinDriveMode.Input);
                     //Set a tolarance of 50milliseconds so any electical noise is not caught.
                     this.GpioPin.DebounceTimeout = TimeSpan.FromMilliseconds(50);
-
-                    //this.GpioPin.ValueChanged += GpioPin_ValueChanged;
                 }
                 catch (Exception)
                 {

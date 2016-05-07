@@ -14,7 +14,7 @@ namespace Example595N
     public sealed class StartupTask : IBackgroundTask
     {
         //Use this to specify additional registers chained together.
-        static int registerqt = 1;
+        static int registerqt = 2;
 
         //Pass in the pins that you have the register hooked up with.
         Shift595N shift = new Shift595N(22, 27, 18, registerqt);
