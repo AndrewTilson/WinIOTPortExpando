@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices.WindowsRuntime;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -22,8 +24,8 @@ namespace WinIOTPortExpando
         {
             private PinOut PinPL, PinCP, PinCE;
             private PinIn PinQ7;
-            private string currentstate; //store binary value of whats commited to the shift register
-            private int NumberOfPins;
+            private BitArray currentstate; //store binary value of whats commited to the shift register
+            private int PinQT;
             private ThreadPoolTimer timer;
 
             public delegate void MyEventHandler(pinchange m);
@@ -40,10 +42,9 @@ namespace WinIOTPortExpando
                 this.PinQ7 = new PinIn(Q7Pin);
 
                 //calculate the number of bits that need to be set
-                NumberOfPins = NumOfRegisters * 8;
+                PinQT = NumOfRegisters*8-1;
 
-                //build variable that state is stored in.
-                this.currentstate = new string('1', NumberOfPins);
+                this.currentstate = new BitArray(PinQT + 1);
 
                 read();
                 this.timer = ThreadPoolTimer.CreatePeriodicTimer(Timer_tick, TimeSpan.FromMilliseconds(50));
@@ -53,36 +54,37 @@ namespace WinIOTPortExpando
             {
                 lock (thisLock)
                 {
-                    //string temp = (this.currentstate.Reverse()).ToString();
-                    string temp = this.currentstate;
-                    if (temp != read())
+                    //get the previous state
+                    BitArray temp = new BitArray(this.currentstate);
+                    
+                    read();
+                    //check if previous state = current state
+                    if (!comparebitarray(temp, this.currentstate, PinQT))
                     {
-                        temp = new string(temp.ToCharArray().Reverse().ToArray());
-                        //string tempcurrent = (this.currentstate.Reverse()).ToString();
-                        string tempcurrent = new string(this.currentstate.ToCharArray().Reverse().ToArray());
                         Dictionary<int, bool> addstate = new Dictionary<int, bool>();
-                        for (int i = 0; i <= NumberOfPins - 1; i++)
-                        {
-                            if (temp[i] != tempcurrent[i])
+
+                            for (int pinbit = 0; pinbit <= PinQT; pinbit++)
                             {
-                                pinchange statechange = new pinchange();
-                                if (tempcurrent[i].ToString() == "1")
+                                if (temp[pinbit] != this.currentstate[pinbit])
                                 {
-                                    addstate.Add(i, true);
-                                }
-                                else
-                                {
-                                    addstate.Add(i, false);
+                                    pinchange statechange = new pinchange();
+                                    if (this.currentstate[pinbit] == true)
+                                    {
+                                        addstate.Add(pinbit, true);
+                                    }
+                                    else
+                                    {
+                                        addstate.Add(pinbit, false);
+                                    }
                                 }
                             }
-                        }
                         statechange.pinstate = addstate;
                         OnChange(statechange);
                     }
                 }
             }
 
-            public string read()
+            public BitArray read()
             {
                 GpioPinValue tempval;
 
@@ -90,21 +92,21 @@ namespace WinIOTPortExpando
                 PinPL.putEnabled(false);
                 PinCE.putEnabled(true);
 
-                //int retval = 0;
-                for (int i = 0; i <= NumberOfPins-1; i++)
+                for (int i = PinQT; i >= 0; i--)
                 {
-                    //retval = retval << 1;
                     tempval = PinQ7.GpioPin.Read();
+
                     if (tempval == GpioPinValue.High)
                     {
-                        this.currentstate = this.currentstate.Remove(i, 1).Insert(i, "1");
+                        this.currentstate[i] = true;
                     }
-                    else if (tempval == GpioPinValue.Low)
+                        else
                     {
-                    this.currentstate = this.currentstate.Remove(i, 1).Insert(i, "0");
+                        this.currentstate[i] = false;
                     }
                     clock();
                 }
+
                 PinCE.putEnabled(false);
                 return this.currentstate;
             }
@@ -113,6 +115,18 @@ namespace WinIOTPortExpando
             {
                 PinCP.putEnabled(true);
                 PinCP.putEnabled(false);
+            }
+
+            private bool comparebitarray(BitArray a, BitArray b, int length)
+            {
+                for (int i = 0; i <= length; i++)
+                {
+                    if (a[i] != b[i])
+                    {
+                        return false;
+                    }
+                }
+                return true;
             }
         }
     }
