@@ -47,7 +47,7 @@ namespace WinIOTPortExpando
                 this.currentstate = new BitArray(PinQT + 1);
 
                 read();
-                this.timer = ThreadPoolTimer.CreatePeriodicTimer(Timer_tick, TimeSpan.FromMilliseconds(50));
+                this.timer = ThreadPoolTimer.CreatePeriodicTimer(Timer_tick, TimeSpan.FromMilliseconds(125));
             }
 
             private void Timer_tick(ThreadPoolTimer timer)
