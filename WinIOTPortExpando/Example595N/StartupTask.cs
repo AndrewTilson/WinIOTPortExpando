@@ -14,23 +14,23 @@ namespace Example595N
     public sealed class StartupTask : IBackgroundTask
     {
         //Use this to specify additional registers chained together.
-        static int registerqt = 2;
+        static int registerqt = 1;
 
         //Pass in the pins that you have the register hooked up with.
         Shift595N shift = new Shift595N(22, 27, 18, registerqt);
 
         public void Run(IBackgroundTaskInstance taskInstance)
         {
-            int pins = registerqt * 8;
+            int pins = registerqt * 8 - 1;
             int speed = 25;
             for (int loop = 0; loop < 2; loop++)
             {
-                for (int pin = 1; pin <= pins; pin++)
+                for (int pin = 0; pin <= pins; pin++)
                 {
                     shift.putEnabled(pin, true);
                     Task.Delay(speed).Wait();
                 }
-                for (int pin = pins; pin >= 1; pin--)
+                for (int pin = pins; pin >= 0; pin--)
                 {
                     shift.putEnabled(pin, false);
                     Task.Delay(speed).Wait();
@@ -39,12 +39,12 @@ namespace Example595N
 
             for (int loop = 0; loop < 2; loop++)
             {
-                for (int pin = 1; pin <= pins; pin++)
+                for (int pin = 0; pin <= pins; pin++)
                 {
                     shift.putEnabled(pin, true);
                     Task.Delay(speed).Wait();
                 }
-                for (int pin = 1; pin <= pins; pin++)
+                for (int pin = 0; pin <= pins; pin++)
                 {
                     shift.putEnabled(pin, false);
                     Task.Delay(speed).Wait();

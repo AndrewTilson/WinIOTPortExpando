@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Windows.Devices.Gpio;
 using static WinIOTPortExpando.GPIOAccess;
 using Windows.Foundation;
+using System.Collections;
 
 namespace WinIOTPortExpando
 {
@@ -16,7 +17,8 @@ namespace WinIOTPortExpando
         public class Shift595N
         {
             private PinOut PinSDI, PinRCLK, PinSRCLK;     // Serial Data Input 22 14, Shift Register Clock 27 11, Storage Register Clock 18 12
-            private string currentstate; //store binary value of whats commited to the shift register
+            private BitArray currentstate; //store binary value of whats commited to the shift register
+            private int PinQT;
 
             public Shift595N(int SDIPin, int SRCLKPin, int CLKPin, int NumOfRegisters)
             {
@@ -25,10 +27,10 @@ namespace WinIOTPortExpando
                 this.PinSRCLK = new PinOut(SRCLKPin);
 
                 //calculate the number of bits that need to be set
-                NumOfRegisters = NumOfRegisters * 8;
+                PinQT = NumOfRegisters * 8 - 1;
 
-                //build variable that state is stored in.
-                this.currentstate = new string('1', NumOfRegisters);
+                currentstate = new BitArray(PinQT + 1);
+
                 allEnabled(false);
             }
 
@@ -37,11 +39,11 @@ namespace WinIOTPortExpando
                 switch (state)
                 {
                     case true:
-                        this.currentstate = new string('1', this.currentstate.Count());
+                        this.currentstate.SetAll(false);
                         sendToRegister();
                         break;
                     case false:
-                        this.currentstate = new string('0', this.currentstate.Count());
+                        this.currentstate.SetAll(false);
                         sendToRegister();
                         break;
                 }
@@ -50,40 +52,32 @@ namespace WinIOTPortExpando
             public virtual bool getPinState(int pin)
             {
                 checkpins(pin);
-                pin = pin - 1;
-                if (this.currentstate.Length >= pin)
+                switch (this.currentstate[pin])
                 {
-                    switch (this.currentstate[pin])
-                    {
-                        case '0': { return false; }
-                        default: { return true; }
-                    }
-                }
-                else
-                {
-                    return false;
+                    case true: { return false; }
+                    default: { return true; }
                 }
             }
 
             public void putEnabled(int pin, bool state)
             {
                 checkpins(pin);
-                pin = pin - 1;
                 switch (state)
                 {
-                    case true: { this.currentstate = this.currentstate.Remove(pin, 1).Insert(pin, "1"); break; }
-                    case false: { this.currentstate = this.currentstate.Remove(pin, 1).Insert(pin, "0"); break; }
+                    case true: { this.currentstate[pin] = false; break; }
+                    default: { this.currentstate[pin] = true; break; }
                 }
                 sendToRegister();
             }
 
             private void sendToRegister()
             {
-                foreach (char digit in this.currentstate.Reverse())
+                //do this in the reverse order since each bit clocked in is shifted.
+                for (int i = PinQT; i >= 0; i--)
                 {
-                    switch (digit)
+                    switch (this.currentstate[i])
                     {
-                        case '0': { PinSDI.putEnabled(true); break; }
+                        case true: { PinSDI.putEnabled(true); break; }
                         default: { PinSDI.putEnabled(false); break; }
                     }
                     PulseSRCLK();
@@ -107,9 +101,10 @@ namespace WinIOTPortExpando
                 PinRCLK.putEnabled(false);
             }
 
+            //Used to ensure that the pin passed is a valid pin to change.
             internal void checkpins(int pin)
             {
-                if (pin > this.currentstate.Count() || pin < 0)
+                if (pin > PinQT || pin < 0)
                 {
                     throw new ArgumentOutOfRangeException("Invalid pin number. Ensure that you instantiated with enough registers defined.");
                 }
