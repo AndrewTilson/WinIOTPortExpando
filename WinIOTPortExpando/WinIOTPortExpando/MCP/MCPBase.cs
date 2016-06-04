@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -21,7 +22,7 @@ namespace WinIOTPortExpando.MCPBase
         internal byte PORT_EXPANDER_I2C_ADDRESS; //7-bit I2C address of the port expander
         internal GPIOAccess.PinIn interuptA; //input pin to recive interupt signal
         internal GPIOAccess.PinIn interuptB; //input pin to recive interupt signal
-        //internal byte PORT_EXPANDER_IOCON_REGISTER_ADDRESS = 0x0A; // I/O Expander Configruation Register
+        internal byte PORT_EXPANDER_IOCON_REGISTER_ADDRESS = 0x0A; // I/O Expander Configruation Register
         internal List<Pin> MCPpins = new List<Pin>(); //list of all pins on the device
         internal List<BankDetails> banks = new List<BankDetails>(); //list of banks on the device
         internal I2cDevice i2cPortExpander; //device object used to communicate
@@ -29,7 +30,7 @@ namespace WinIOTPortExpando.MCPBase
         internal byte[] i2CWriteBuffer;
         internal byte[] i2CReadBuffer = new byte[0xff];
         internal byte bitMask;
-        //private byte ioconRegister; //local copy of the I2C Port Expander IOCON register
+        private byte ioconRegister; //local copy of the I2C Port Expander IOCON register
 
         internal async Task MCPinit()
         {
@@ -49,12 +50,12 @@ namespace WinIOTPortExpando.MCPBase
                 return;
             }
 
-            ////configure device for open - drain output on the interrupt pin
-            //i2CWriteBuffer = new byte[] { PORT_EXPANDER_IOCON_REGISTER_ADDRESS, 0x02 };
-            //i2cPortExpander.Write(i2CWriteBuffer);
+            //configure device for open - drain output on the interrupt pin
+            i2CWriteBuffer = new byte[] { PORT_EXPANDER_IOCON_REGISTER_ADDRESS, 0x02 };
+            i2cPortExpander.Write(i2CWriteBuffer);
 
-            //i2cPortExpander.WriteRead(new byte[] { PORT_EXPANDER_IOCON_REGISTER_ADDRESS }, i2CReadBuffer);
-            //ioconRegister = i2CReadBuffer[0];
+            i2cPortExpander.WriteRead(new byte[] { PORT_EXPANDER_IOCON_REGISTER_ADDRESS }, i2CReadBuffer);
+            ioconRegister = i2CReadBuffer[0];
 
             //initialize banks
             foreach (BankDetails bank in banks)
@@ -165,32 +166,31 @@ namespace WinIOTPortExpando.MCPBase
 
         private void InteruptChangeA(GpioPin sender, GpioPinValueChangedEventArgs args)
         {
-            //foreach (BankDetails bank in banks)
-            //{
-            //    i2cPortExpander.WriteRead(new byte[] { bank.PORT_EXPANDER_INTF_REGISTER_ADDRESS }, i2CReadBuffer);
-            //    bank.intfRegister = i2CReadBuffer[0];
-            //}
+            i2cPortExpander.WriteRead(new byte[] { banks[0].PORT_EXPANDER_INTF_REGISTER_ADDRESS }, i2CReadBuffer);
+            banks[0].intfRegister = i2CReadBuffer[0];
 
-            //foreach (Pin pin in MCPpins)
-            //{
-            //    if (pin.bank == PinOpt.bank.A)
-            //    {
-            //        if ((banks[0].intfRegister & (byte)pin.pin) != 0)
-            //        {
-            //            pin.test();
-            //        }
-            //    }
-            //    else if (pin.bank == PinOpt.bank.B)
-            //    {
-            //        if ((banks[1].intfRegister & (byte)pin.pin) != 0)
-            //        {
-            //            pin.test();
-            //        }
-            //    }
-            //}
+            Debug.WriteLine("InteruptA " + banks[0].intfRegister.ToString());
+            foreach (Pin pin in MCPpins)
+            {
+                if ((banks[0].intfRegister & (byte)pin.pin) != 0)
+                {
+                    pin.test();
+                }
+            }
         }
         private void InteruptChangeB(GpioPin sender, GpioPinValueChangedEventArgs args)
         {
+            i2cPortExpander.WriteRead(new byte[] { banks[1].PORT_EXPANDER_INTF_REGISTER_ADDRESS }, i2CReadBuffer);
+            banks[1].intfRegister = i2CReadBuffer[0];
+
+            Debug.WriteLine("InteruptB " + banks[1].intfRegister.ToString());
+            foreach (Pin pin in MCPpins)
+            {
+                if ((banks[1].intfRegister & (byte)pin.pin) != 0)
+                {
+                    pin.test();
+                }
+            }
         }
     }
 }

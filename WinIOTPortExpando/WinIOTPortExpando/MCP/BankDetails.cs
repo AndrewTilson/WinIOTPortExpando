@@ -63,8 +63,6 @@ namespace WinIOTPortExpando.MCPBase
             // initialize local copies of the IODIR, GPIO, and OLAT registers
             i2CReadBuffer = new byte[1];
 
-            // read in each register value on register at a time (could do this all at once but
-            // for example clarity purposes we do it this way)
             i2c.WriteRead(new byte[] { PORT_EXPANDER_IODIR_REGISTER_ADDRESS }, i2CReadBuffer);
             iodirRegister = i2CReadBuffer[0];
 

@@ -89,7 +89,7 @@ namespace WinIOTPortExpando.MCPBase
 
                 }
                 i2cPortExpander.Write(new byte[] { bank.PORT_EXPANDER_IODIR_REGISTER_ADDRESS, bank.iodirRegister });
-                //i2cPortExpander.Write(new byte[] { bank.PORT_EXPANDER_GPINT_REGISTER_ADDRESS, bank.gpintRegister });
+                i2cPortExpander.Write(new byte[] { bank.PORT_EXPANDER_GPINT_REGISTER_ADDRESS, bank.gpintRegister });
             }
         }
     }
