@@ -13,6 +13,20 @@ namespace WinIOTPortExpando.MCPBase
         public PinOpt.pin pin { get; set; }
         public PinOpt.IO IO { get; set; }
         public bank bank { get; set; }
+
+        public delegate void MyEventHandler(Pin m);
+        public event MyEventHandler OnChange;
+
+        //method for MCPBase to trigger the event.
+        internal void test()
+        {
+            //change to show value of pin
+            //requires a option to show value
+            if(OnChange != null)
+            {
+                OnChange(this);
+            }
+        }
     }
 
     public class PinOpt

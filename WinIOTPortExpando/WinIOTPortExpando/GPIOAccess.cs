@@ -75,7 +75,7 @@ namespace WinIOTPortExpando
             public GpioPin GpioPin { get; internal set; }
 
             //initialization that takes the pin being created
-            public PinIn(int pinNum)
+            public PinIn(int pinNum, bool debouncetimeout = true)
             {
                 var gpio = GpioController.GetDefault();
 
@@ -90,7 +90,10 @@ namespace WinIOTPortExpando
                     this.GpioPin = gpio.OpenPin(this.Device_PIN);
                     this.GpioPin.SetDriveMode(GpioPinDriveMode.Input);
                     //Set a tolarance of 50milliseconds so any electical noise is not caught.
-                    this.GpioPin.DebounceTimeout = TimeSpan.FromMilliseconds(50);
+                    if (debouncetimeout == true)
+                    {
+                        this.GpioPin.DebounceTimeout = TimeSpan.FromMilliseconds(50);
+                    }
                 }
                 catch (Exception)
                 {

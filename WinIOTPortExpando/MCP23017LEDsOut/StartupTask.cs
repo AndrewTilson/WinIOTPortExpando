@@ -9,11 +9,11 @@ using System.Threading.Tasks;
 
 // The Background Application template is documented at http://go.microsoft.com/fwlink/?LinkID=533884&clcid=0x409
 
-namespace MCP
+namespace MCP23017LEDsOut
 {
     public sealed class StartupTask : IBackgroundTask
     {
-        MCP23017 register1 = new MCP23017(0x20);
+        MCP23017 register1 = new MCP23017(0x20, 4, 17);
         List<Pin> allpins = new List<Pin>();
 
         public async void Run(IBackgroundTaskInstance taskInstance)
@@ -38,6 +38,8 @@ namespace MCP
                 Pin pin14 = new Pin { bank = PinOpt.bank.B, pin = PinOpt.pin.GP6, IO = PinOpt.IO.output };
                 Pin pin15 = new Pin { bank = PinOpt.bank.B, pin = PinOpt.pin.GP7, IO = PinOpt.IO.output };
 
+                pin15.OnChange += changed;
+
                 allpins = new List<Pin> { pin0, pin1, pin2, pin3, pin4, pin5, pin6, pin7, pin8, pin9, pin10, pin11, pin12, pin13, pin14, pin15 };
                 register1.addpins(allpins);
                 register1.init();
@@ -52,6 +54,17 @@ namespace MCP
             {
                 deferral.Complete();
             }
+        }
+
+        private async void changed(Pin m)
+        {
+            register1.PutOutputPinEnabled(m, true);
+            await Task.Delay(25);
+            register1.PutOutputPinEnabled(m, false);
+            await Task.Delay(25);
+            register1.PutOutputPinEnabled(m, true);
+            await Task.Delay(25);
+            register1.PutOutputPinEnabled(m, false);
         }
 
         public async void moveleds()

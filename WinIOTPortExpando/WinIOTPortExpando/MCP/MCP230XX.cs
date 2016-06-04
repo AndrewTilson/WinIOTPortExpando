@@ -8,53 +8,88 @@ namespace WinIOTPortExpando.MCPBase
 {
     public class MCP23017 : MCPBase
     {
-        public MCP23017(byte I2CAddress = 0x20, int InteruptPin = 0)
+        public MCP23017(byte I2CAddress = 0x20, int InteruptPinA = 0, int InteruptPinB = 0)
         {
             PORT_EXPANDER_I2C_ADDRESS = I2CAddress;
-            if (InteruptPin != 0)
+            if (InteruptPinA != 0)
             {
-                interupt = new GPIOAccess.PinIn(InteruptPin);
+                interuptA = new GPIOAccess.PinIn(InteruptPinA, false);
             }
             else
             {
-                interupt = null;
+                interuptA = null;
+            }
+            if (InteruptPinB != 0)
+            {
+                interuptB = new GPIOAccess.PinIn(InteruptPinB, false);
+            }
+            else
+            {
+                interuptB = null;
             }
         }
 
         public void init()
         {
             //add the 2 banks for a MCP23017
-            banks.Add(new BankDetails { PORT_EXPANDER_IODIR_REGISTER_ADDRESS = 0x00, PORT_EXPANDER_GPIO_REGISTER_ADDRESS = 0x09, PORT_EXPANDER_OLAT_REGISTER_ADDRESS = 0x0A });
-            banks.Add(new BankDetails { PORT_EXPANDER_IODIR_REGISTER_ADDRESS = 0x10, PORT_EXPANDER_GPIO_REGISTER_ADDRESS = 0x19, PORT_EXPANDER_OLAT_REGISTER_ADDRESS = 0x1A });
+            banks.Add(new BankDetails {
+                PORT_EXPANDER_IODIR_REGISTER_ADDRESS = 0x00,
+                PORT_EXPANDER_IPOL_REGISTER_ADDRESS = 0x02,
+                PORT_EXPANDER_GPINT_REGISTER_ADDRESS = 0x04,
+                PORT_EXPANDER_DEFVAL_REGISTER_ADDRESS = 0x06,
+                PORT_EXPANDER_INTCON_REGISTER_ADDRESS = 0x08,
+                PORT_EXPANDER_GPPU_REGISTER_ADDRESS = 0x0C,
+                PORT_EXPANDER_INTF_REGISTER_ADDRESS = 0x0E,
+                PORT_EXPANDER_INTCAP_REGISTER_ADDRESS = 0x10,
+                PORT_EXPANDER_GPIO_REGISTER_ADDRESS = 0x12,
+                PORT_EXPANDER_OLAT_REGISTER_ADDRESS = 0x14,
+                bank = PinOpt.bank.A
+            });
+            banks.Add(new BankDetails {
+                PORT_EXPANDER_IODIR_REGISTER_ADDRESS = 0x01,
+                PORT_EXPANDER_IPOL_REGISTER_ADDRESS = 0x03,
+                PORT_EXPANDER_GPINT_REGISTER_ADDRESS = 0x05,
+                PORT_EXPANDER_DEFVAL_REGISTER_ADDRESS = 0x07,
+                PORT_EXPANDER_INTCON_REGISTER_ADDRESS = 0x09,
+                PORT_EXPANDER_GPPU_REGISTER_ADDRESS = 0x0D,
+                PORT_EXPANDER_INTF_REGISTER_ADDRESS = 0x0F,
+                PORT_EXPANDER_INTCAP_REGISTER_ADDRESS = 0x11,
+                PORT_EXPANDER_GPIO_REGISTER_ADDRESS = 0x13,
+                PORT_EXPANDER_OLAT_REGISTER_ADDRESS = 0x15,
+                bank = PinOpt.bank.B
+            });
 
             //call initialization of base inherited class to initialize the i2c device
             var task = MCPinit();
             task.Wait();
 
-            //set the IO for each pin that was created
-            foreach (Pin pin in MCPpins)
+            foreach (BankDetails bank in banks)
             {
-                //create temp bank and set it = to the bank the pin references.
-                BankDetails tempbank = new BankDetails();
-
-                if (pin.bank == PinOpt.bank.A) { tempbank = banks[0]; }
-                else if (pin.bank == PinOpt.bank.B) { tempbank = banks[1]; }
-
-                //determine if pin is input or output and set the bit as needed.
-                if (pin.IO == PinOpt.IO.output)
+                foreach (Pin pin in MCPpins)
                 {
-                    bitMask = (byte)(tempbank.iodirRegister ^ (byte)pin.pin);
-                    tempbank.iodirRegister &= bitMask;
-                }
-                else if (pin.IO == PinOpt.IO.input)
-                {
-                    bitMask = (byte)(tempbank.iodirRegister |= (byte)pin.pin);
-                    tempbank.iodirRegister &= bitMask;
-                }
+                    if (pin.bank == bank.bank)
+                    {
+                        if (pin.IO == PinOpt.IO.output)
+                        {
+                            bitMask = (byte)(bank.iodirRegister ^ (byte)pin.pin);
+                            bank.iodirRegister &= bitMask;
 
-                //write out desired bits
-                i2CWriteBuffer = new byte[] { tempbank.PORT_EXPANDER_IODIR_REGISTER_ADDRESS, tempbank.iodirRegister };
-                i2cPortExpander.Write(i2CWriteBuffer);
+                            bitMask = (byte)(0xFF ^ (byte)pin.pin);
+                            bank.gpintRegister &= bitMask;
+                        }
+                        else if (pin.IO == PinOpt.IO.input)
+                        {
+                            bitMask = (byte)(bank.iodirRegister |= (byte)pin.pin);
+                            bank.iodirRegister &= bitMask;
+
+                            bitMask = (byte)(0x00 ^ (byte)pin.pin);
+                            bank.gpintRegister |= bitMask;
+                        }
+                    }
+
+                }
+                i2cPortExpander.Write(new byte[] { bank.PORT_EXPANDER_IODIR_REGISTER_ADDRESS, bank.iodirRegister });
+                //i2cPortExpander.Write(new byte[] { bank.PORT_EXPANDER_GPINT_REGISTER_ADDRESS, bank.gpintRegister });
             }
         }
     }
@@ -67,11 +102,11 @@ namespace WinIOTPortExpando.MCPBase
 
             if (InteruptPin != 0)
             {
-                interupt = new GPIOAccess.PinIn(InteruptPin);
+                interuptA = new GPIOAccess.PinIn(InteruptPin, false);
             }
             else
             {
-                interupt = null;
+                interuptA = null;
             }
         }
 
@@ -81,8 +116,21 @@ namespace WinIOTPortExpando.MCPBase
             var task = MCPinit();
             task.Wait();
 
-            //add the 2 banks for a MCP23017
-            banks.Add(new BankDetails { PORT_EXPANDER_IODIR_REGISTER_ADDRESS = 0x00, PORT_EXPANDER_GPIO_REGISTER_ADDRESS = 0x09, PORT_EXPANDER_OLAT_REGISTER_ADDRESS = 0x0A });
+            //add the bank for a MCP23008
+            banks.Add(new BankDetails
+            {
+                PORT_EXPANDER_IODIR_REGISTER_ADDRESS = 0x00,
+                PORT_EXPANDER_IPOL_REGISTER_ADDRESS = 0x02,
+                PORT_EXPANDER_GPINT_REGISTER_ADDRESS = 0x04,
+                PORT_EXPANDER_DEFVAL_REGISTER_ADDRESS = 0x06,
+                PORT_EXPANDER_INTCON_REGISTER_ADDRESS = 0x08,
+                PORT_EXPANDER_GPPU_REGISTER_ADDRESS = 0x0C,
+                PORT_EXPANDER_INTF_REGISTER_ADDRESS = 0x0E,
+                PORT_EXPANDER_INTCAP_REGISTER_ADDRESS = 0x10,
+                PORT_EXPANDER_GPIO_REGISTER_ADDRESS = 0x12,
+                PORT_EXPANDER_OLAT_REGISTER_ADDRESS = 0x14,
+                bank = PinOpt.bank.A
+            });
 
             //set the IO for each pin that was created
             foreach (Pin pin in MCPpins)
@@ -100,8 +148,7 @@ namespace WinIOTPortExpando.MCPBase
                 }
 
                 //write out desired bits
-                i2CWriteBuffer = new byte[] { banks[0].PORT_EXPANDER_IODIR_REGISTER_ADDRESS, banks[0].iodirRegister };
-                i2cPortExpander.Write(i2CWriteBuffer);
+                i2cPortExpander.Write(new byte[] { banks[0].PORT_EXPANDER_IODIR_REGISTER_ADDRESS, banks[0].iodirRegister });
             }
         }
     }
