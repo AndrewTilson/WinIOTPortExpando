@@ -16,22 +16,22 @@ namespace MCP23017InAndOut
         MCP23017 register1 = new MCP23017(0x20, 4);
         List<Pin> allpins = new List<Pin>();
 
-        Pin led0 = new Pin { bank = PinOpt.bank.A, pin = PinOpt.pin.GP0, IO = PinOpt.IO.output };
-        Pin led1 = new Pin { bank = PinOpt.bank.A, pin = PinOpt.pin.GP1, IO = PinOpt.IO.output };
-        Pin led2 = new Pin { bank = PinOpt.bank.A, pin = PinOpt.pin.GP2, IO = PinOpt.IO.output };
-        Pin led3 = new Pin { bank = PinOpt.bank.A, pin = PinOpt.pin.GP3, IO = PinOpt.IO.output };
-        Pin led4 = new Pin { bank = PinOpt.bank.A, pin = PinOpt.pin.GP4, IO = PinOpt.IO.output };
-        Pin led5 = new Pin { bank = PinOpt.bank.A, pin = PinOpt.pin.GP5, IO = PinOpt.IO.output };
-        Pin led6 = new Pin { bank = PinOpt.bank.A, pin = PinOpt.pin.GP6, IO = PinOpt.IO.output };
-        Pin led7 = new Pin { bank = PinOpt.bank.A, pin = PinOpt.pin.GP7, IO = PinOpt.IO.output };
-        Pin sw0 = new Pin { bank = PinOpt.bank.B, pin = PinOpt.pin.GP0, IO = PinOpt.IO.input };
-        Pin sw1 = new Pin { bank = PinOpt.bank.B, pin = PinOpt.pin.GP1, IO = PinOpt.IO.input };
-        Pin sw2 = new Pin { bank = PinOpt.bank.B, pin = PinOpt.pin.GP2, IO = PinOpt.IO.input };
-        Pin sw3 = new Pin { bank = PinOpt.bank.B, pin = PinOpt.pin.GP3, IO = PinOpt.IO.input };
-        Pin sw4 = new Pin { bank = PinOpt.bank.B, pin = PinOpt.pin.GP4, IO = PinOpt.IO.input };
-        Pin sw5 = new Pin { bank = PinOpt.bank.B, pin = PinOpt.pin.GP5, IO = PinOpt.IO.input };
-        Pin sw6 = new Pin { bank = PinOpt.bank.B, pin = PinOpt.pin.GP6, IO = PinOpt.IO.input };
-        Pin sw7 = new Pin { bank = PinOpt.bank.B, pin = PinOpt.pin.GP7, IO = PinOpt.IO.input };
+        Pin led0 = new Pin { register = PinOpt.register.A, pin = PinOpt.pin.GP0, IO = PinOpt.IO.output };
+        Pin led1 = new Pin { register = PinOpt.register.A, pin = PinOpt.pin.GP1, IO = PinOpt.IO.output };
+        Pin led2 = new Pin { register = PinOpt.register.A, pin = PinOpt.pin.GP2, IO = PinOpt.IO.output };
+        Pin led3 = new Pin { register = PinOpt.register.A, pin = PinOpt.pin.GP3, IO = PinOpt.IO.output };
+        Pin led4 = new Pin { register = PinOpt.register.A, pin = PinOpt.pin.GP4, IO = PinOpt.IO.output };
+        Pin led5 = new Pin { register = PinOpt.register.A, pin = PinOpt.pin.GP5, IO = PinOpt.IO.output };
+        Pin led6 = new Pin { register = PinOpt.register.A, pin = PinOpt.pin.GP6, IO = PinOpt.IO.output };
+        Pin led7 = new Pin { register = PinOpt.register.A, pin = PinOpt.pin.GP7, IO = PinOpt.IO.output };
+        Pin sw0 = new Pin { register = PinOpt.register.B, pin = PinOpt.pin.GP0, IO = PinOpt.IO.input };
+        Pin sw1 = new Pin { register = PinOpt.register.B, pin = PinOpt.pin.GP1, IO = PinOpt.IO.input };
+        Pin sw2 = new Pin { register = PinOpt.register.B, pin = PinOpt.pin.GP2, IO = PinOpt.IO.input };
+        Pin sw3 = new Pin { register = PinOpt.register.B, pin = PinOpt.pin.GP3, IO = PinOpt.IO.input };
+        Pin sw4 = new Pin { register = PinOpt.register.B, pin = PinOpt.pin.GP4, IO = PinOpt.IO.input };
+        Pin sw5 = new Pin { register = PinOpt.register.B, pin = PinOpt.pin.GP5, IO = PinOpt.IO.input };
+        Pin sw6 = new Pin { register = PinOpt.register.B, pin = PinOpt.pin.GP6, IO = PinOpt.IO.input };
+        Pin sw7 = new Pin { register = PinOpt.register.B, pin = PinOpt.pin.GP7, IO = PinOpt.IO.input };
 
         public async void Run(IBackgroundTaskInstance taskInstance)
         {

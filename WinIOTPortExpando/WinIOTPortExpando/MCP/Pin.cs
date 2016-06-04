@@ -7,25 +7,6 @@ using static WinIOTPortExpando.MCPBase.PinOpt;
 
 namespace WinIOTPortExpando.MCPBase
 {
-    public class Pin
-    {
-        public PinOpt.pin pin { get; set; }
-        public PinOpt.IO IO { get; set; }
-        public bank bank { get; set; }
-
-        public delegate void MyEventHandler(Pin m);
-        public event MyEventHandler OnChange;
-
-        //method for MCPBase to trigger the event.
-        internal void test()
-        {
-            if(OnChange != null)
-            {
-                OnChange(this);
-            }
-        }
-    }
-
     public class PinOpt
     {
         //pins variable to simplify consumption.
@@ -48,10 +29,29 @@ namespace WinIOTPortExpando.MCPBase
             output
         }
 
-        public enum bank
+        public enum register
         {
             A,
             B
+        }
+    }
+
+    public class Pin
+    {
+        public PinOpt.pin pin { get; set; }
+        public PinOpt.IO IO { get; set; }
+        public register register { get; set; }
+
+        public delegate void MyEventHandler(Pin m);
+        public event MyEventHandler OnChange;
+
+        //method for MCPBase to trigger the event.
+        internal void TriggerChange()
+        {
+            if(OnChange != null)
+            {
+                OnChange(this);
+            }
         }
     }
 }

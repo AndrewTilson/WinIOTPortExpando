@@ -20,14 +20,13 @@ namespace WinIOTPortExpando.MCPBase
     {
         internal const string I2C_CONTROLLER_NAME = "I2C1"; //specific to RPi2 or RPi3
         internal byte PORT_EXPANDER_I2C_ADDRESS; //7-bit I2C address of the port expander
+        internal byte PORT_EXPANDER_IOCON_REGISTER_ADDRESS = 0x0A; // I/O Expander Configruation Register
         internal GPIOAccess.PinIn interuptA; //input pin to recive interupt signal
         internal GPIOAccess.PinIn interuptB; //input pin to recive interupt signal
-        internal byte PORT_EXPANDER_IOCON_REGISTER_ADDRESS = 0x0A; // I/O Expander Configruation Register
         internal List<Pin> MCPpins = new List<Pin>(); //list of all pins on the device
-        internal List<BankDetails> banks = new List<BankDetails>(); //list of banks on the device
+        internal List<Register> registers = new List<Register>(); //list of registers on the device
         internal I2cDevice i2cPortExpander; //device object used to communicate
 
-        internal byte[] i2CWriteBuffer;
         internal byte[] i2CReadBuffer = new byte[0xff];
         internal byte bitMask;
         private byte ioconRegister; //local copy of the I2C Port Expander IOCON register
@@ -51,27 +50,47 @@ namespace WinIOTPortExpando.MCPBase
             }
 
             //configure device for open - drain output on the interrupt pin
-            i2CWriteBuffer = new byte[] { PORT_EXPANDER_IOCON_REGISTER_ADDRESS, 0x02 };
-            i2cPortExpander.Write(i2CWriteBuffer);
+            i2cPortExpander.Write(new byte[] { PORT_EXPANDER_IOCON_REGISTER_ADDRESS, 0x02 });
 
             i2cPortExpander.WriteRead(new byte[] { PORT_EXPANDER_IOCON_REGISTER_ADDRESS }, i2CReadBuffer);
             ioconRegister = i2CReadBuffer[0];
 
-            //initialize banks
-            foreach (BankDetails bank in banks)
+            //initialize registers
+            foreach (Register register in registers)
             {
-                bank.init(i2cPortExpander);
+                register.init(i2cPortExpander);
+
+                //set IO for pins
+                foreach (Pin pin in MCPpins)
+                {
+                    if (pin.register == register.register)
+                    {
+                        if (pin.IO == PinOpt.IO.output)
+                        {
+                            bitMask = (byte)(register.iodirRegister ^ (byte)pin.pin);
+                            register.iodirRegister &= bitMask;
+
+                            bitMask = (byte)(0xFF ^ (byte)pin.pin);
+                            register.gpintRegister &= bitMask;
+                        }
+                        else if (pin.IO == PinOpt.IO.input)
+                        {
+                            bitMask = (byte)(register.iodirRegister |= (byte)pin.pin);
+                            register.iodirRegister &= bitMask;
+
+                            bitMask = (byte)(0x00 ^ (byte)pin.pin);
+                            register.gpintRegister |= bitMask;
+                        }
+                    }
+
+                }
+                i2cPortExpander.Write(new byte[] { register.PORT_EXPANDER_IODIR_REGISTER_ADDRESS, register.iodirRegister });
+                i2cPortExpander.Write(new byte[] { register.PORT_EXPANDER_GPINT_REGISTER_ADDRESS, register.gpintRegister });
             }
 
             //create event subscription for interupt pin if it was provided.
-            if (interuptA != null)
-            {
-                interuptA.GpioPin.ValueChanged += InteruptChangeA;
-            }
-            if (interuptB != null)
-            {
-                interuptB.GpioPin.ValueChanged += InteruptChangeB;
-            }
+            if (interuptA != null) { interuptA.GpioPin.ValueChanged += InteruptChangeA; }
+            if (interuptB != null) { interuptB.GpioPin.ValueChanged += InteruptChangeB; }
         }
 
         //add pins to object so that methods like putalloutputpinsenabled function.
@@ -96,34 +115,34 @@ namespace WinIOTPortExpando.MCPBase
             //Check that the pin is an output pin.
             if (pin.IO == PinOpt.IO.output)
             {
-                //create temp bank and set it = to the bank the pin references.
-                BankDetails tempbank = new BankDetails();
+                //create temp register and set it = to the register the pin references.
+                Register tempregister = new Register();
 
-                if (pin.bank == PinOpt.bank.A) { tempbank = banks[0]; }
-                else if (pin.bank == PinOpt.bank.B) { tempbank = banks[1]; }
+                if (pin.register == PinOpt.register.A) { tempregister = registers[0]; }
+                else if (pin.register == PinOpt.register.B) { tempregister = registers[1]; }
 
                 //Get state of pins and then adjust the pin requested.
-                i2cPortExpander.WriteRead(new byte[] { tempbank.PORT_EXPANDER_GPIO_REGISTER_ADDRESS }, i2CReadBuffer);
+                i2cPortExpander.WriteRead(new byte[] { tempregister.PORT_EXPANDER_GPIO_REGISTER_ADDRESS }, i2CReadBuffer);
                 switch (enable)
                 {
                     case false:
                         {
                             bitMask = (byte)(i2CReadBuffer[0] ^ (byte)pin.pin);
-                            tempbank.olatRegister &= bitMask;
+                            tempregister.olatRegister &= bitMask;
                             break;
                         }
                     case true:
                         {
                             bitMask = (byte)(i2CReadBuffer[0] ^ (byte)pin.pin);
-                            tempbank.olatRegister |= bitMask;
+                            tempregister.olatRegister |= bitMask;
                             break;
                         }
                 }
 
                 //Only if the pin state is different than what was read from the i2cdevice then do a write.
-                if (i2CReadBuffer[0] != tempbank.olatRegister)
+                if (i2CReadBuffer[0] != tempregister.olatRegister)
                 {
-                    i2cPortExpander.Write(new byte[] { tempbank.PORT_EXPANDER_OLAT_REGISTER_ADDRESS, tempbank.olatRegister });
+                    i2cPortExpander.Write(new byte[] { tempregister.PORT_EXPANDER_OLAT_REGISTER_ADDRESS, tempregister.olatRegister });
                 }
             }
             else
@@ -145,51 +164,45 @@ namespace WinIOTPortExpando.MCPBase
         //Take pin and live from register determine if pin is enabled or not.
         public bool getEnabled(Pin pin)
         {
-            if (pin.bank == PinOpt.bank.A)
+            if (pin.register == PinOpt.register.A)
             {
-                banks[0].gpioRegister = getpinval(banks[0]);
+                registers[0].gpioRegister = getpinval(registers[0]);
             }
             else
             {
-                banks[1].gpioRegister = getpinval(banks[1]);
+                registers[1].gpioRegister = getpinval(registers[1]);
             }
             return (i2CReadBuffer[0] & (byte)pin.pin) != (byte)pin.pin;
         }
 
-        //read 8 bit value from specified bank and update the banks local value
-        internal byte getpinval(BankDetails bank)
+        //read 8 bit value from specified register and update the registers local value
+        internal byte getpinval(Register register)
         {
-            i2cPortExpander.WriteRead(new byte[] { bank.PORT_EXPANDER_GPIO_REGISTER_ADDRESS }, i2CReadBuffer);
-            bank.gpioRegister = i2CReadBuffer[0];
-            return bank.gpioRegister;
+            i2cPortExpander.WriteRead(new byte[] { register.PORT_EXPANDER_GPIO_REGISTER_ADDRESS }, i2CReadBuffer);
+            register.gpioRegister = i2CReadBuffer[0];
+            return register.gpioRegister;
         }
 
         private void InteruptChangeA(GpioPin sender, GpioPinValueChangedEventArgs args)
         {
-            i2cPortExpander.WriteRead(new byte[] { banks[0].PORT_EXPANDER_INTF_REGISTER_ADDRESS }, i2CReadBuffer);
-            banks[0].intfRegister = i2CReadBuffer[0];
+            i2cPortExpander.WriteRead(new byte[] { registers[0].PORT_EXPANDER_INTF_REGISTER_ADDRESS }, i2CReadBuffer);
+            registers[0].intfRegister = i2CReadBuffer[0];
 
-            Debug.WriteLine("InteruptA " + banks[0].intfRegister.ToString());
+            Debug.WriteLine("InteruptA " + registers[0].intfRegister.ToString());
             foreach (Pin pin in MCPpins)
             {
-                if ((banks[0].intfRegister & (byte)pin.pin) != 0)
-                {
-                    pin.test();
-                }
+                if ((registers[0].intfRegister & (byte)pin.pin) != 0) { pin.TriggerChange(); }
             }
         }
         private void InteruptChangeB(GpioPin sender, GpioPinValueChangedEventArgs args)
         {
-            i2cPortExpander.WriteRead(new byte[] { banks[1].PORT_EXPANDER_INTF_REGISTER_ADDRESS }, i2CReadBuffer);
-            banks[1].intfRegister = i2CReadBuffer[0];
+            i2cPortExpander.WriteRead(new byte[] { registers[1].PORT_EXPANDER_INTF_REGISTER_ADDRESS }, i2CReadBuffer);
+            registers[1].intfRegister = i2CReadBuffer[0];
 
-            Debug.WriteLine("InteruptB " + banks[1].intfRegister.ToString());
+            Debug.WriteLine("InteruptB " + registers[1].intfRegister.ToString());
             foreach (Pin pin in MCPpins)
             {
-                if ((banks[1].intfRegister & (byte)pin.pin) != 0)
-                {
-                    pin.test();
-                }
+                if ((registers[1].intfRegister & (byte)pin.pin) != 0) { pin.TriggerChange(); }
             }
         }
     }

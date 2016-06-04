@@ -8,9 +8,9 @@ using Windows.Devices.I2c;
 
 namespace WinIOTPortExpando.MCPBase
 {
-    internal class BankDetails
+    internal class Register
     {
-        internal PinOpt.bank bank { get; set; }
+        internal PinOpt.register register { get; set; }
 
         internal byte PORT_EXPANDER_IODIR_REGISTER_ADDRESS { get; set; } // IODIR register controls the direction of the GPIO on the port expander
         internal byte PORT_EXPANDER_IPOL_REGISTER_ADDRESS { get; set; } // Input Polarity Register
@@ -53,7 +53,7 @@ namespace WinIOTPortExpando.MCPBase
             }
             catch (Exception ex)
             {
-                throw new Exception("Failed to initialize bank: " + ex.Message);
+                throw new Exception("Failed to initialize register: " + ex.Message);
             }
             return;
         }
