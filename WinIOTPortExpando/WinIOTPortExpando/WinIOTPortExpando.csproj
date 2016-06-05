@@ -115,7 +115,6 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ShiftRegister\ShiftRegister165N.cs" />
     <Compile Include="ShiftRegister\ShiftRegister595N.cs" />
-    <Compile Include="test.cs" />
     <EmbeddedResource Include="Properties\WinIOTPortExpando.rd.xml" />
   </ItemGroup>
   <ItemGroup>
