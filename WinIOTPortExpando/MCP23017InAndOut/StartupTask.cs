@@ -13,7 +13,8 @@ namespace MCP23017InAndOut
 {
     public sealed class StartupTask : IBackgroundTask
     {
-        MCP23017 register1 = new MCP23017(0x20, 4);
+        //create new device with address and interupt pins.
+        MCP23017 register = new MCP23017(0x20, 17, 4);
         List<Pin> allpins = new List<Pin>();
 
         Pin led0 = new Pin { register = PinOpt.register.A, pin = PinOpt.pin.GP0, IO = PinOpt.IO.output };
@@ -38,6 +39,7 @@ namespace MCP23017InAndOut
             var deferral = taskInstance.GetDeferral();
             try
             {
+                //subscribing to all switches to turn on/off the coresponding led.
                 sw0.OnChange += sw0change;
                 sw1.OnChange += sw1change;
                 sw2.OnChange += sw2change;
@@ -46,13 +48,16 @@ namespace MCP23017InAndOut
                 sw5.OnChange += sw5change;
                 sw6.OnChange += sw6change;
                 sw7.OnChange += sw7change;
-
+                
+                //adding pins to the register object.
                 allpins = new List<Pin> { led0, led1, led2, led3, led4, led5, led6, led7, sw0, sw1, sw2, sw3, sw4, sw5, sw6, sw7 };
-                register1.addpins(allpins);
-                register1.init();
+                register.addpins(allpins);
+                //initialize communication to the device
+                register.init();
 
                 do
                 {
+                    //forcing a loop to keep the main thread active
                     await Task.Delay(15000);
                 } while (true);
             }
@@ -64,42 +69,42 @@ namespace MCP23017InAndOut
 
         private void sw7change(Pin m)
         {
-            register1.PutOutputPinEnabled(led7, register1.getEnabled(m));
+            register.PutOutputPinEnabled(led7, register.getEnabled(m));
         }
 
         private void sw6change(Pin m)
         {
-            register1.PutOutputPinEnabled(led6, register1.getEnabled(m));
+            register.PutOutputPinEnabled(led6, register.getEnabled(m));
         }
 
         private void sw5change(Pin m)
         {
-            register1.PutOutputPinEnabled(led5, register1.getEnabled(m));
+            register.PutOutputPinEnabled(led5, register.getEnabled(m));
         }
 
         private void sw4change(Pin m)
         {
-            register1.PutOutputPinEnabled(led4, register1.getEnabled(m));
+            register.PutOutputPinEnabled(led4, register.getEnabled(m));
         }
 
         private void sw3change(Pin m)
         {
-            register1.PutOutputPinEnabled(led3, register1.getEnabled(m));
+            register.PutOutputPinEnabled(led3, register.getEnabled(m));
         }
 
         private void sw2change(Pin m)
         {
-            register1.PutOutputPinEnabled(led2, register1.getEnabled(m));
+            register.PutOutputPinEnabled(led2, register.getEnabled(m));
         }
 
         private void sw1change(Pin m)
         {
-            register1.PutOutputPinEnabled(led1, register1.getEnabled(m));
+            register.PutOutputPinEnabled(led1, register.getEnabled(m));
         }
 
         private void sw0change(Pin m)
         {
-            register1.PutOutputPinEnabled(led0, register1.getEnabled(m));
+            register.PutOutputPinEnabled(led0, register.getEnabled(m));
         }
     }
 }

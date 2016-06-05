@@ -124,54 +124,44 @@ namespace WinIOTPortExpando.MCPBase
         }
 
         //enable or disable all pin
-        public void PutOutputPinEnabled(Pin pin, bool enable)
+        public void PutOutputPinEnabled(Pin[] pins, bool enable)
         {
-            //Check that the pin is an output pin.
-            if (pin.IO == PinOpt.IO.output)
+            foreach (Register register in registers)
             {
-                //create temp register and set it = to the register the pin references.
-                Register tempregister = new Register();
+                //Get state of pins on the register
+                i2cPortExpander.WriteRead(new byte[] { register.PORT_EXPANDER_GPIO_REGISTER_ADDRESS }, i2CReadBuffer);
 
-                if (pin.register == PinOpt.register.A) { tempregister = registers[0]; }
-                else if (pin.register == PinOpt.register.B) { tempregister = registers[1]; }
-
-                //Get state of pins and then adjust the pin requested.
-                i2cPortExpander.WriteRead(new byte[] { tempregister.PORT_EXPANDER_GPIO_REGISTER_ADDRESS }, i2CReadBuffer);
-                switch (enable)
+                foreach (Pin pin in pins.Where(p => p.register == register.register && p.IO == PinOpt.IO.output))
                 {
-                    case false:
-                        {
-                            bitMask = (byte)(i2CReadBuffer[0] ^ (byte)pin.pin);
-                            tempregister.olatRegister &= bitMask;
-                            break;
-                        }
-                    case true:
-                        {
-                            bitMask = (byte)(i2CReadBuffer[0] ^ (byte)pin.pin);
-                            tempregister.olatRegister |= bitMask;
-                            break;
-                        }
+                    switch (enable)
+                    {
+                        case false:
+                            {
+                                bitMask = (byte)(i2CReadBuffer[0] ^ (byte)pin.pin);
+                                register.olatRegister &= bitMask;
+                                break;
+                            }
+                        case true:
+                            {
+                                bitMask = (byte)(i2CReadBuffer[0] ^ (byte)pin.pin);
+                                register.olatRegister |= bitMask;
+                                break;
+                            }
+                    }
                 }
-
                 //Only if the pin state is different than what was read from the i2cdevice then do a write.
-                if (i2CReadBuffer[0] != tempregister.olatRegister)
+                if (i2CReadBuffer[0] != register.olatRegister)
                 {
-                    i2cPortExpander.Write(new byte[] { tempregister.PORT_EXPANDER_OLAT_REGISTER_ADDRESS, tempregister.olatRegister });
+                    i2cPortExpander.Write(new byte[] { register.PORT_EXPANDER_OLAT_REGISTER_ADDRESS, register.olatRegister });
                 }
             }
         }
 
         //enable or disable all passed pins
-        public void PutOutputPinEnabled(Pin[] pins, bool enable)
+        public void PutOutputPinEnabled(Pin pin, bool enable)
         {
-            //Loop through pins and call single pin PutOutputPinEnabled.
-            foreach (Pin pin in pins)
-            {
-                if (pin.IO != PinOpt.IO.input)
-                {
-                    PutOutputPinEnabled(pin, enable);
-                }
-            }
+            Pin[] pinarr = new Pin[] { pin };
+            PutOutputPinEnabled(pinarr, enable);
         }
 
         //Take pin and live from register determine if pin is enabled or not.
