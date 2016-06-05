@@ -33,6 +33,11 @@ namespace WinIOTPortExpando.MCPBase
 
         internal async Task MCPinit()
         {
+            if (MCPpins.Count == 0)
+            {
+                throw new ArgumentException("Must add pin objects via addpins before pins on the register can be used");
+            }
+
             //initialize I2C communications
             try
             {
@@ -50,7 +55,7 @@ namespace WinIOTPortExpando.MCPBase
             }
 
             //configure device for open - drain output on the interrupt pin
-            i2cPortExpander.Write(new byte[] { PORT_EXPANDER_IOCON_REGISTER_ADDRESS, 0x02 });
+            i2cPortExpander.Write(new byte[] { PORT_EXPANDER_IOCON_REGISTER_ADDRESS, 0x00 });
 
             i2cPortExpander.WriteRead(new byte[] { PORT_EXPANDER_IOCON_REGISTER_ADDRESS }, i2CReadBuffer);
             ioconRegister = i2CReadBuffer[0];
@@ -65,32 +70,46 @@ namespace WinIOTPortExpando.MCPBase
                 {
                     if (pin.register == register.register)
                     {
-                        if (pin.IO == PinOpt.IO.output)
-                        {
-                            bitMask = (byte)(register.iodirRegister ^ (byte)pin.pin);
-                            register.iodirRegister &= bitMask;
-
-                            bitMask = (byte)(0xFF ^ (byte)pin.pin);
-                            register.gpintRegister &= bitMask;
-                        }
-                        else if (pin.IO == PinOpt.IO.input)
+                        if (pin.IO == PinOpt.IO.input)
                         {
                             bitMask = (byte)(register.iodirRegister |= (byte)pin.pin);
                             register.iodirRegister &= bitMask;
 
                             bitMask = (byte)(0x00 ^ (byte)pin.pin);
+                            register.intconRegister |= bitMask;
+
+                            bitMask = (byte)(0x00 ^ (byte)pin.pin);
                             register.gpintRegister |= bitMask;
+
+                            bitMask = (byte)(0xFF ^ (byte)pin.pin);
+                            register.gppuRegister &= bitMask;
+                        }
+                        else if (pin.IO == PinOpt.IO.output)
+                        {
+                            bitMask = (byte)(register.iodirRegister ^ (byte)pin.pin);
+                            register.iodirRegister &= bitMask;
+
+                            bitMask = (byte)(0xFF ^ (byte)pin.pin);
+                            register.intconRegister &= bitMask;
+
+                            bitMask = (byte)(0xFF ^ (byte)pin.pin);
+                            register.gpintRegister &= bitMask;
+
+                            bitMask = (byte)(0xFF ^ (byte)pin.pin);
+                            register.gppuRegister &= bitMask;
                         }
                     }
-
                 }
-                i2cPortExpander.Write(new byte[] { register.PORT_EXPANDER_IODIR_REGISTER_ADDRESS, register.iodirRegister });
+
                 i2cPortExpander.Write(new byte[] { register.PORT_EXPANDER_GPINT_REGISTER_ADDRESS, register.gpintRegister });
+                i2cPortExpander.Write(new byte[] { register.PORT_EXPANDER_INTCON_REGISTER_ADDRESS, register.intconRegister });
+                i2cPortExpander.Write(new byte[] { register.PORT_EXPANDER_GPPU_REGISTER_ADDRESS, register.gppuRegister });
+                i2cPortExpander.Write(new byte[] { register.PORT_EXPANDER_IODIR_REGISTER_ADDRESS, register.iodirRegister });
             }
 
             //create event subscription for interupt pin if it was provided.
-            if (interuptA != null) { interuptA.GpioPin.ValueChanged += InteruptChangeA; }
-            if (interuptB != null) { interuptB.GpioPin.ValueChanged += InteruptChangeB; }
+            if (interuptA != null) { interuptA.GpioPin.ValueChanged += InteruptChange; }
+            if (interuptB != null) { interuptB.GpioPin.ValueChanged += InteruptChange; }
         }
 
         //add pins to object so that methods like putalloutputpinsenabled function.
@@ -157,7 +176,10 @@ namespace WinIOTPortExpando.MCPBase
             //Loop through pins and call single pin PutOutputPinEnabled.
             foreach (Pin pin in pins)
             {
-                PutOutputPinEnabled(pin, enable);
+                if (pin.IO != PinOpt.IO.input)
+                {
+                    PutOutputPinEnabled(pin, enable);
+                }
             }
         }
 
@@ -183,26 +205,37 @@ namespace WinIOTPortExpando.MCPBase
             return register.gpioRegister;
         }
 
-        private void InteruptChangeA(GpioPin sender, GpioPinValueChangedEventArgs args)
+        private void InteruptChange(GpioPin sender, GpioPinValueChangedEventArgs args)
         {
-            i2cPortExpander.WriteRead(new byte[] { registers[0].PORT_EXPANDER_INTF_REGISTER_ADDRESS }, i2CReadBuffer);
-            registers[0].intfRegister = i2CReadBuffer[0];
+            Register tempregister = new Register();
+            byte previousestate = new byte();
 
-            Debug.WriteLine("InteruptA " + registers[0].intfRegister.ToString());
-            foreach (Pin pin in MCPpins)
+            if (sender.PinNumber == interuptA.Device_PIN)
             {
-                if ((registers[0].intfRegister & (byte)pin.pin) != 0) { pin.TriggerChange(); }
+                tempregister = registers[0];
             }
-        }
-        private void InteruptChangeB(GpioPin sender, GpioPinValueChangedEventArgs args)
-        {
-            i2cPortExpander.WriteRead(new byte[] { registers[1].PORT_EXPANDER_INTF_REGISTER_ADDRESS }, i2CReadBuffer);
-            registers[1].intfRegister = i2CReadBuffer[0];
-
-            Debug.WriteLine("InteruptB " + registers[1].intfRegister.ToString());
-            foreach (Pin pin in MCPpins)
+            else if (sender.PinNumber == interuptB.Device_PIN)
             {
-                if ((registers[1].intfRegister & (byte)pin.pin) != 0) { pin.TriggerChange(); }
+                tempregister = registers[1];
+            }
+
+            i2cPortExpander.WriteRead(new byte[] { tempregister.PORT_EXPANDER_INTCAP_REGISTER_ADDRESS }, i2CReadBuffer);
+            previousestate = i2CReadBuffer[0];
+
+            i2cPortExpander.WriteRead(new byte[] { tempregister.PORT_EXPANDER_INTF_REGISTER_ADDRESS }, i2CReadBuffer);
+            if (i2CReadBuffer[0] != tempregister.intfRegister)
+            {
+                tempregister.intfRegister = i2CReadBuffer[0];
+
+                //Debug.WriteLine("Register" + tempregister.register + " " + tempregister.intfRegister.ToString());
+
+                foreach (Pin pin in MCPpins.Where(p => p.register == PinOpt.register.B))
+                {
+                    if ((previousestate & (byte)pin.pin) != 0)
+                    {
+                        pin.TriggerChange();
+                    }
+                }
             }
         }
     }

@@ -29,6 +29,7 @@ namespace WinIOTPortExpando.MCPBase
         internal byte gpintRegister { get; set; } // copy of I2C Port Expander GPINT register
         internal byte intconRegister { get; set; } // copy of I2C Port Expander INTCON register
         internal byte intfRegister { get; set; } // copy of I2C Port Expander INTF register
+        internal byte gppuRegister { get; set; } // copy of I2C Port Expander INTF register
 
         private byte[] i2CWriteBuffer;
         private byte[] i2CReadBuffer;
@@ -58,7 +59,7 @@ namespace WinIOTPortExpando.MCPBase
             return;
         }
 
-        private void GetRegisterValues(I2cDevice i2c)
+        internal void GetRegisterValues(I2cDevice i2c)
         {
             // initialize local copies of the IODIR, GPIO, and OLAT registers
             i2CReadBuffer = new byte[1];
@@ -77,6 +78,11 @@ namespace WinIOTPortExpando.MCPBase
 
             i2c.WriteRead(new byte[] { PORT_EXPANDER_INTCON_REGISTER_ADDRESS }, i2CReadBuffer);
             intconRegister = i2CReadBuffer[0];
+
+            i2c.WriteRead(new byte[] { PORT_EXPANDER_INTF_REGISTER_ADDRESS }, i2CReadBuffer);
+            intfRegister = i2CReadBuffer[0];
+
+            i2c.WriteRead(new byte[] { PORT_EXPANDER_DEFVAL_REGISTER_ADDRESS }, i2CReadBuffer);
         }
     }
 }
