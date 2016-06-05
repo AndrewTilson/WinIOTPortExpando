@@ -50,8 +50,7 @@ namespace WinIOTPortExpando.MCPBase
             }
             catch (Exception e)
             {
-                System.Diagnostics.Debug.WriteLine("Exception: {0}", e.Message);
-                return;
+                throw new TypeInitializationException("Unable to initialize communication to the device", e);
             }
 
             //configure device for open - drain output on the interrupt pin
@@ -60,12 +59,12 @@ namespace WinIOTPortExpando.MCPBase
             i2cPortExpander.WriteRead(new byte[] { PORT_EXPANDER_IOCON_REGISTER_ADDRESS }, i2CReadBuffer);
             ioconRegister = i2CReadBuffer[0];
 
-            //initialize registers
+            //set IO, pullup, and interupt status for pins
             foreach (Register register in registers)
             {
+                //initialize register
                 register.init(i2cPortExpander);
 
-                //set IO for pins
                 foreach (Pin pin in MCPpins)
                 {
                     if (pin.register == register.register)
@@ -80,9 +79,6 @@ namespace WinIOTPortExpando.MCPBase
 
                             bitMask = (byte)(0x00 ^ (byte)pin.pin);
                             register.gpintRegister |= bitMask;
-
-                            bitMask = (byte)(0xFF ^ (byte)pin.pin);
-                            register.gppuRegister &= bitMask;
                         }
                         else if (pin.IO == PinOpt.IO.output)
                         {
@@ -94,16 +90,15 @@ namespace WinIOTPortExpando.MCPBase
 
                             bitMask = (byte)(0xFF ^ (byte)pin.pin);
                             register.gpintRegister &= bitMask;
-
-                            bitMask = (byte)(0xFF ^ (byte)pin.pin);
-                            register.gppuRegister &= bitMask;
                         }
+                        bitMask = (byte)(0xFF ^ (byte)pin.pin);
+                        register.gppuRegister &= bitMask; //always leaving pullup resistor disabled as testing shows this to be unstable.
                     }
                 }
 
                 i2cPortExpander.Write(new byte[] { register.PORT_EXPANDER_GPINT_REGISTER_ADDRESS, register.gpintRegister });
                 i2cPortExpander.Write(new byte[] { register.PORT_EXPANDER_INTCON_REGISTER_ADDRESS, register.intconRegister });
-                i2cPortExpander.Write(new byte[] { register.PORT_EXPANDER_GPPU_REGISTER_ADDRESS, register.gppuRegister });
+                i2cPortExpander.Write(new byte[] { register.PORT_EXPANDER_GPPU_REGISTER_ADDRESS, register.gppuRegister }); 
                 i2cPortExpander.Write(new byte[] { register.PORT_EXPANDER_IODIR_REGISTER_ADDRESS, register.iodirRegister });
             }
 
@@ -164,10 +159,6 @@ namespace WinIOTPortExpando.MCPBase
                     i2cPortExpander.Write(new byte[] { tempregister.PORT_EXPANDER_OLAT_REGISTER_ADDRESS, tempregister.olatRegister });
                 }
             }
-            else
-            {
-                throw new ArgumentException("One of the pins specified is not an output pin.");
-            }
         }
 
         //enable or disable all passed pins
@@ -188,17 +179,17 @@ namespace WinIOTPortExpando.MCPBase
         {
             if (pin.register == PinOpt.register.A)
             {
-                registers[0].gpioRegister = getpinval(registers[0]);
+                registers[0].gpioRegister = getpinvals(registers[0]);
             }
             else
             {
-                registers[1].gpioRegister = getpinval(registers[1]);
+                registers[1].gpioRegister = getpinvals(registers[1]);
             }
             return (i2CReadBuffer[0] & (byte)pin.pin) != (byte)pin.pin;
         }
 
         //read 8 bit value from specified register and update the registers local value
-        internal byte getpinval(Register register)
+        internal byte getpinvals(Register register)
         {
             i2cPortExpander.WriteRead(new byte[] { register.PORT_EXPANDER_GPIO_REGISTER_ADDRESS }, i2CReadBuffer);
             register.gpioRegister = i2CReadBuffer[0];
@@ -208,20 +199,26 @@ namespace WinIOTPortExpando.MCPBase
         private void InteruptChange(GpioPin sender, GpioPinValueChangedEventArgs args)
         {
             Register tempregister = new Register();
+            PinOpt.register thisregister = new PinOpt.register();
             byte previousestate = new byte();
 
+            //get register need for the interrupt pin that triggered the interrupt
             if (sender.PinNumber == interuptA.Device_PIN)
             {
                 tempregister = registers[0];
+                thisregister = PinOpt.register.A;
             }
             else if (sender.PinNumber == interuptB.Device_PIN)
             {
                 tempregister = registers[1];
+                thisregister = PinOpt.register.B;
             }
 
+            //get state of register before interrupt
             i2cPortExpander.WriteRead(new byte[] { tempregister.PORT_EXPANDER_INTCAP_REGISTER_ADDRESS }, i2CReadBuffer);
             previousestate = i2CReadBuffer[0];
 
+            //get the pin that triggered the interrupt
             i2cPortExpander.WriteRead(new byte[] { tempregister.PORT_EXPANDER_INTF_REGISTER_ADDRESS }, i2CReadBuffer);
             if (i2CReadBuffer[0] != tempregister.intfRegister)
             {
@@ -229,7 +226,8 @@ namespace WinIOTPortExpando.MCPBase
 
                 //Debug.WriteLine("Register" + tempregister.register + " " + tempregister.intfRegister.ToString());
 
-                foreach (Pin pin in MCPpins.Where(p => p.register == PinOpt.register.B))
+                //check each pin that is in the register that was interrupt and if it was the cause of the interrupt trigger its onchange action
+                foreach (Pin pin in MCPpins.Where(p => p.register == thisregister))
                 {
                     if ((previousestate & (byte)pin.pin) != 0)
                     {

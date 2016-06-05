@@ -61,7 +61,7 @@ namespace WinIOTPortExpando.MCPBase
 
         internal void GetRegisterValues(I2cDevice i2c)
         {
-            // initialize local copies of the IODIR, GPIO, and OLAT registers
+            // initialize local copies of the registers
             i2CReadBuffer = new byte[1];
 
             i2c.WriteRead(new byte[] { PORT_EXPANDER_IODIR_REGISTER_ADDRESS }, i2CReadBuffer);
@@ -81,8 +81,6 @@ namespace WinIOTPortExpando.MCPBase
 
             i2c.WriteRead(new byte[] { PORT_EXPANDER_INTF_REGISTER_ADDRESS }, i2CReadBuffer);
             intfRegister = i2CReadBuffer[0];
-
-            i2c.WriteRead(new byte[] { PORT_EXPANDER_DEFVAL_REGISTER_ADDRESS }, i2CReadBuffer);
         }
     }
 }
