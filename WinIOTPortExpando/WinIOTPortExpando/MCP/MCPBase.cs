@@ -20,7 +20,7 @@ namespace WinIOTPortExpando.MCPBase
     {
         internal const string I2C_CONTROLLER_NAME = "I2C1"; //specific to RPi2 or RPi3
         internal byte PORT_EXPANDER_I2C_ADDRESS; //7-bit I2C address of the port expander
-        internal byte PORT_EXPANDER_IOCON_REGISTER_ADDRESS = 0x0A; // I/O Expander Configruation Register
+        internal byte PORT_EXPANDER_IOCON_REGISTER_ADDRESS; // I/O Expander Configruation Register
         internal GPIOAccess.PinIn interuptA; //input pin to recive interupt signal
         internal GPIOAccess.PinIn interuptB; //input pin to recive interupt signal
         internal List<Pin> MCPpins = new List<Pin>(); //list of all pins on the device
@@ -31,13 +31,9 @@ namespace WinIOTPortExpando.MCPBase
         internal byte bitMask;
         private byte ioconRegister; //local copy of the I2C Port Expander IOCON register
 
-        internal async Task MCPinit()
+        //0x0A is the address for mcp23017. Leaving it default and allowing mcp23008 to overide.
+        internal async Task MCPinit(byte PORT_EXPANDER_IOCON_REGISTER_ADDRESS = 0x0A)
         {
-            if (MCPpins.Count == 0)
-            {
-                throw new ArgumentException("Must add pin objects via addpins before pins on the register can be used");
-            }
-
             //initialize I2C communications
             try
             {
@@ -91,14 +87,11 @@ namespace WinIOTPortExpando.MCPBase
                             bitMask = (byte)(0xFF ^ (byte)pin.pin);
                             register.gpintRegister &= bitMask;
                         }
-                        bitMask = (byte)(0xFF ^ (byte)pin.pin);
-                        register.gppuRegister &= bitMask; //always leaving pullup resistor disabled as testing shows this to be unstable.
                     }
                 }
 
                 i2cPortExpander.Write(new byte[] { register.PORT_EXPANDER_GPINT_REGISTER_ADDRESS, register.gpintRegister });
                 i2cPortExpander.Write(new byte[] { register.PORT_EXPANDER_INTCON_REGISTER_ADDRESS, register.intconRegister });
-                i2cPortExpander.Write(new byte[] { register.PORT_EXPANDER_GPPU_REGISTER_ADDRESS, register.gppuRegister }); 
                 i2cPortExpander.Write(new byte[] { register.PORT_EXPANDER_IODIR_REGISTER_ADDRESS, register.iodirRegister });
             }
 
@@ -176,6 +169,19 @@ namespace WinIOTPortExpando.MCPBase
                 registers[1].gpioRegister = getpinvals(registers[1]);
             }
             return (i2CReadBuffer[0] & (byte)pin.pin) != (byte)pin.pin;
+        }
+
+        //can be used if needed to manually manipulate the GPIO register for when attaching devices to the MCP expander.
+        public void writegpio(PinOpt.register register, byte value)
+        {
+            if (register == PinOpt.register.A)
+            {
+                i2cPortExpander.WriteRead(new byte[] { registers[0].PORT_EXPANDER_GPIO_REGISTER_ADDRESS }, i2CReadBuffer);
+            }
+            else if (register == PinOpt.register.B)
+            {
+                i2cPortExpander.WriteRead(new byte[] { registers[1].PORT_EXPANDER_GPIO_REGISTER_ADDRESS }, i2CReadBuffer);
+            }
         }
 
         //read 8 bit value from specified register and update the registers local value

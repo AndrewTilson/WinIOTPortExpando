@@ -83,8 +83,9 @@ namespace WinIOTPortExpando.MCPBase
             });
 
             //call initialization of base inherited class to initialize the i2c device
-            var task = MCPinit();
+            var task = MCPinit(0x05);
             task.Wait();
         }
+
     }
 }

@@ -40,11 +40,11 @@ namespace WinIOTPortExpando.MCPBase
             {
                 GetRegisterValues(i2c);
 
-                //Disable pull up resistor
+                //Always leaving pullup resistor disabled as testing shows this to be unstable.
                 i2CWriteBuffer = new byte[] { PORT_EXPANDER_GPPU_REGISTER_ADDRESS, 0x00 };
                 i2c.Write(i2CWriteBuffer);
 
-                //Set all to outputs
+                //Set all to outputs as defaults
                 i2CWriteBuffer = new byte[] { PORT_EXPANDER_IODIR_REGISTER_ADDRESS, 0x00 };
                 i2c.Write(i2CWriteBuffer);
 
