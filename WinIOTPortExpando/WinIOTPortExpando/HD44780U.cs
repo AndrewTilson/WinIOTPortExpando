@@ -1,218 +1,407 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
+using Windows.Devices.Gpio;
 using WinIOTPortExpando.MCPBase;
 using static WinIOTPortExpando.MCPBase.PinOpt;
 
 
 namespace WinIOTPortExpando
 {
-    //This class has not been fully tested yet. Turns out the lcd screen i have on hand was bad so until i have one to test with i cannot verify this is working.
+    //Credit is given to:
+    //https://github.com/Voltrr1/LCDWin10
+    //I managed to take the code here and convert its contoller logic to use my MCPBase class rather than the direct GPIO's on the board.
+
     public class HD44780U
     {
-        private const byte ENABLE_BIT = 0x20;
-        private const byte ENABLE_BIT_INVERSE = 0xDF;
-        private const byte READ_BIT = 0x40;
-        private const byte DATA_BIT = 0x80;
-        private const byte WRITE_INSTRUCTION = 0x0;
-        private const byte WRITE_DATA = DATA_BIT;
-        internal PinOpt.register register { get; set; }
+        private String cleanline = "";
+        // commands
+        private const int LCD_CLEARDISPLAY = 0x01;
+        private const int LCD_RETURNHOME = 0x02;
+        private const int LCD_ENTRYMODESET = 0x04;
+        private const int LCDDisplayControl = 0x08;
+        private const int LCD_CURSORSHIFT = 0x10;
+        private const int LCD_FUNCTIONSET = 0x20;
+        private const int LCD_SETCGRAMADDR = 0x40;
+        private const int LCD_SETDDRAMADDR = 0x80;
 
-        public enum PortExpander
+        // flags for display entry mode
+        private const int LCD_ENTRYRIGHT = 0x00;
+        private const int LCD_ENTRYLEFT = 0x02;
+        private const int LCD_ENTRYSHIFTINCREMENT = 0x01;
+        private const int LCD_ENTRYSHIFTDECREMENT = 0x00;
+
+        // flags for display on/off control
+        private const int LCD_DISPLAYON = 0x04;
+        private const int LCD_DISPLAYOFF = 0x00;
+        private const int LCD_CURSORON = 0x02;
+        private const int LCD_CURSOROFF = 0x00;
+        private const int LCD_BLINKON = 0x01;
+        private const int LCD_BLINKOFF = 0x00;
+
+        // flags for display/cursor shift
+        private const int LCD_DISPLAYMOVE = 0x08;
+        private const int LCD_CURSORMOVE = 0x00;
+        private const int LCD_MOVERIGHT = 0x04;
+        private const int LCD_MOVELEFT = 0x00;
+
+        // flags for function set
+        private const int LCD_8BITMODE = 0x10;
+        private const int LCD_4BITMODE = 0x00;
+        private const int LCD_2LINE = 0x08;
+        private const int LCD_1LINE = 0x00;
+        public const int LCD_5x10DOTS = 0x04;
+        public const int LCD_5x8DOTS = 0x00;
+
+        private MCPBase.MCPBase controller;
+        private Pin[] DPin = new Pin[8];
+        private Pin RsPin = null;
+        private Pin EnPin = null;
+
+
+        private int DisplayFunction = 0;
+        private int DisplayControl = 0;
+        private int DisplayMode = 0;
+
+        private int _cols = 0;
+        private int _rows = 0;
+        private int _currentrow = 0;
+
+        private String[] buffer = null;
+
+        public bool AutoScroll = false;
+
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void delayMicroseconds(int uS)
         {
-            MCP23017,
-            MCP23008
-        }
+            if (uS > 2000)
+                throw new Exception("Invalid param, use Task.Delay for 2ms and more");
 
-        internal WinIOTPortExpando.MCPBase.MCPBase expander;
+            if (uS < 100) //call takes more time than 100uS 
+                return;
 
-        public HD44780U (byte address, PortExpander ExpanderIC, register register)
-        {
-            switch (ExpanderIC)
+            var tick_to_reach = System.DateTime.UtcNow.Ticks + uS * 1000; //1GHz Raspi2 Clock
+            while (System.DateTime.UtcNow.Ticks < tick_to_reach)
             {
-                case PortExpander.MCP23017:
-                    {
-                        MCP23017 temp = new MCP23017(address);
-                        temp.init();
-                        expander = temp;
-                        break;
-                    }
-                case PortExpander.MCP23008:
-                    {
-                        MCP23008 temp = new MCP23008(address);
-                        temp.init();
-                        expander = temp;
-                        break;
-                    }
             }
         }
 
-        public static void Delay(int ms)
+        public HD44780U(MCPBase.MCPBase register, int cols, int rows, int charsize = LCD_5x8DOTS)
         {
-            int time = Environment.TickCount;
-            while (true)
-                if (Environment.TickCount - time >= ms)
-                    return;
-        }
+            controller = register;
 
+            _cols = cols;
+            _rows = rows;
 
-        public void LcdReset()
-        {
-            //interpreted by HD44780U controller as 8 bits until switched to 4 bits below
-            Send4BitInstruction(0x03); //0011
-            Delay(4);
-            Send4BitInstruction(0x03); //0011
-            Send4BitInstruction(0x03); //0011
+            buffer = new String[rows];
 
-            // Function set (Set interface to be 4 bits long.) Interface is 8 bits in length.
-            Send4BitInstruction(0x02); //0010
-
-            // Set number of lines and font
-            Send4BitInstruction(0x02); //0010
-            Send4BitInstruction(0x08); //1000
-
-            // Turn on display.  No cursor
-            Send4BitInstruction(0x00); //0000
-            Send4BitInstruction(0x0C); //1100
-
-            // Entry mode set - increment addr by 1, shift cursor by right.
-            Send4BitInstruction(0x00); //0000
-            Send4BitInstruction(0x06); //0110
-
-            LcdClear();
-        }
-        public void LcdClear()
-        {
-            Send4BitInstruction(0x00); //0000
-            Send4BitInstruction(0x01); //0001
-            Delay(1);
-            // return to zero
-            Send4BitInstruction(0x00); //0000
-            Send4BitInstruction(0x02); //0010
-            Delay(1);
-        }
-        public void MoveToLine(byte line)
-        {
-            switch (line)
+            for (int i = 0; i < cols; i++)
             {
-                case 0:
-                    SetDisplayAddress(0);
-                    break;
-                case 1:
-                    SetDisplayAddress(64);
-                    break;
+                cleanline = cleanline + " ";
             }
-        }
-        public void PrintLine(string data)
-        {
-            for (int i = 0; i < data.Length; i++)
-            {
-                Send8BitCharacter((byte)data.ToCharArray()[i]);
-                Delay(1);
-            }
-        }
-        private void Send4BitInstruction(byte c)
-        {
-            Send4Bits(WRITE_INSTRUCTION, c);
-        }
 
-        private void Send8BitCharacter(byte c)
-        {
-            byte temp = c;
-            temp >>= 4;
-            Send4Bits(WRITE_DATA, temp);
-            temp = c;
-            temp &= 0x0F;
-            Send4Bits(WRITE_DATA, temp);
-        }
-
-        private void Send4Bits(byte control, byte d)
-        {
-            byte portB = control;
-            portB |= FlipAndShift(d);
-            portB |= ENABLE_BIT;
-
-            if (register == register.A)
-                expander.writegpio(PinOpt.register.A, portB);
+            DisplayFunction = charsize;
+            if (_rows > 1)
+                DisplayFunction = DisplayFunction | LCD_2LINE;
             else
-                expander.writegpio(PinOpt.register.B, portB);
+                DisplayFunction = DisplayFunction | LCD_1LINE;
+        }
 
-            portB &= 0xDF;
-            if (register == register.A)
-                expander.writegpio(PinOpt.register.A, portB);
+        private async Task begin()
+        {
+            await Task.Delay(50);
+            // Now we pull both RS and R/W low to begin commands
+            controller.PutOutputPinEnabled(RsPin, false);
+            controller.PutOutputPinEnabled(EnPin, false);
+
+            //put the LCD into 4 bit or 8 bit mode
+            if ((DisplayFunction & LCD_8BITMODE) != LCD_8BITMODE)
+            {
+                // we start in 8bit mode, try to set 4 bit mode
+                write4bits(0x03);
+                await Task.Delay(5); // wait min 4.1ms
+
+                // second try
+                write4bits(0x03);
+                await Task.Delay(5); // wait min 4.1ms
+
+                // third go!
+                write4bits(0x03);
+                delayMicroseconds(150);
+
+                // finally, set to 4-bit interface
+                write4bits(0x02);
+            }
             else
-                expander.writegpio(PinOpt.register.B, portB);
+            {
+                // Send function set command sequence
+                command((byte)(LCD_FUNCTIONSET | DisplayFunction));
+                await Task.Delay(5); // wait min 4.1ms
+
+                // second try
+                command((byte)(LCD_FUNCTIONSET | DisplayFunction));
+                delayMicroseconds(150);
+
+                // third go
+                command((byte)(LCD_FUNCTIONSET | DisplayFunction));
+            }
+
+            command((byte)(LCD_FUNCTIONSET | DisplayFunction));
+            DisplayControl = LCD_DISPLAYON | LCD_CURSOROFF | LCD_BLINKOFF;
+            DisplayOn();
+
+            await clearAsync();
+
+            DisplayMode = LCD_ENTRYLEFT | LCD_ENTRYSHIFTDECREMENT;
+            command((byte)(LCD_ENTRYMODESET | DisplayMode));
+
         }
 
-        private void SetDisplayAddress(byte addr)
+        //public async Task<bool> InitAsync(int rs, int enable, int d4, int d5, int d6, int d7)
+        public async Task<bool> InitAsync(Pin rs, Pin enable, Pin d4, Pin d5, Pin d6, Pin d7)
         {
-            byte temp = addr;
-            temp >>= 4;
-            temp |= 0x08;
-            Send4BitInstruction(temp);
-            temp = addr;
-            temp &= 0x0F;
-            Send4BitInstruction(temp);
+            try
+            {
+                DisplayFunction = DisplayFunction | LCD_4BITMODE;
+
+                RsPin = rs;
+                EnPin = enable;
+                DPin[0] = d4;
+                DPin[1] = d5;
+                DPin[2] = d6;
+                DPin[3] = d7;
+
+                await begin();
+
+                return true;
+
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+
         }
 
-        private byte FlipAndShift(byte src)
+        private void pulseEnable()
         {
-            byte dest = 0;
-            if ((src & 0x1) != 0)
-            {
-                dest |= 0x10;
-            }
-            if ((src & 0x2) != 0)
-            {
-                dest |= 0x08;
-            }
-            if ((src & 0x4) != 0)
-            {
-                dest |= 0x04;
-            }
-            if ((src & 0x8) != 0)
-            {
-                dest |= 0x02;
-            }
-            return dest;
+            controller.PutOutputPinEnabled(EnPin, false);
+            controller.PutOutputPinEnabled(EnPin, true);
+            controller.PutOutputPinEnabled(EnPin, false);
         }
 
-        public string GetWiringInfo()
+        private void write4bits(byte value)
         {
-            string output = string.Empty;
-            output += "HD44780U Compatible LCD Driver" + Environment.NewLine;
-            output += "Wiring and pin example for LMB162ABC LCD panel" + Environment.NewLine;
-            output += "Pins: " + Environment.NewLine;
-            output += "   1 - Vss (ground)" + Environment.NewLine;
-            output += "   2 - Vdd (+ power)" + Environment.NewLine;
-            output += "   3 - V0 (LCD Contrast reference supply)" + Environment.NewLine;
-            output += "   4 - RS (register select)" + Environment.NewLine;
-            output += "   5 - R/W (read / write control bus)" + Environment.NewLine;
-            output += "   6 - E (data enable)" + Environment.NewLine;
-            output += "   7 - DB0" + Environment.NewLine;
-            output += "   8 - DB1" + Environment.NewLine;
-            output += "   9 - DB2" + Environment.NewLine;
-            output += "   10 - DB3" + Environment.NewLine;
-            output += "   11 - DB4" + Environment.NewLine;
-            output += "   12 - DB5" + Environment.NewLine;
-            output += "   13 - DB6" + Environment.NewLine;
-            output += "   14 - DB7" + Environment.NewLine;
-            output += "   15 - BLA (backlight positive supply)" + Environment.NewLine;
-            output += "   16 - BLK (backlight negative supply)" + Environment.NewLine + Environment.NewLine;
-            output += "Wiring to MCP23017 I/O Expander" + Environment.NewLine;
-            output += "   4 - GPB7" + Environment.NewLine;
-            output += "   5 - GPB6" + Environment.NewLine;
-            output += "   6 - GPB5" + Environment.NewLine;
-            output += "   11 - GPB4" + Environment.NewLine;
-            output += "   12 - GPB3" + Environment.NewLine;
-            output += "   13 - GPB2" + Environment.NewLine;
-            output += "   14 - GPB1" + Environment.NewLine + Environment.NewLine;
-            output += "Wiring can connect to ports B or ports A on the MCP23017." + Environment.NewLine;
-            output += "The port designation is passed into the class upon instantiation.";
+            //String s = "Value :"+value.ToString();
+            for (int i = 0; i < 4; i++)
+            {
+                Pin temppin = DPin[i];
+                var val = (GpioPinValue)((value >> i) & 0x01);
+                controller.PutOutputPinEnabled(temppin, Convert.ToBoolean(val));
+                //DPin[i].Write(val);
+                //  s = DPin[i].PinNumber.ToString()+" /"+ i.ToString() + "=" + val.ToString() + "  " + s;
+            }
+            //Debug.WriteLine(s);
 
-            return output;
+            pulseEnable();
+        }
+
+
+        private void write8bits(byte value)
+        {
+            for (int i = 0; i < 8; i++)
+            {
+                Pin temppin = DPin[i];
+                var val = (GpioPinValue)((value >> 1) & 0x01);
+                //DPin[i].Write(val);
+                controller.PutOutputPinEnabled(temppin, Convert.ToBoolean(val));
+            }
+
+            pulseEnable();
+        }
+
+        //private void send(byte value, GpioPinValue bit8mode)
+        private void send(byte value, bool bit8mode)
+        {
+            //Debug.WriteLine("send :"+value.ToString());
+
+            controller.PutOutputPinEnabled(RsPin, bit8mode);
+
+            if ((DisplayFunction & LCD_8BITMODE) == LCD_8BITMODE)
+            {
+                write8bits(value);
+            }
+            else
+            {
+                byte B = (byte)((value >> 4) & 0x0F);
+                write4bits(B);
+                B = (byte)(value & 0x0F);
+                write4bits(B);
+            }
+        }
+
+        private void write(byte value)
+        {
+            send(value, true);
+        }
+
+        private void command(byte value)
+        {
+            send(value, false);
+        }
+
+        public async Task clearAsync()
+        {
+            command(LCD_CLEARDISPLAY);
+            await Task.Delay(2);
+
+            for (int i = 0; i < _rows; i++)
+            {
+                buffer[i] = "";
+            }
+
+            _currentrow = 0;
+
+            await homeAsync();
+        }
+
+        public async Task homeAsync()
+        {
+            command(LCD_RETURNHOME);
+            await Task.Delay(2);
+        }
+
+        public void write(String text)
+        {
+            var data = Encoding.UTF8.GetBytes(text);
+
+            foreach (byte Ch in data)
+            {
+                write(Ch);
+            }
+        }
+
+        public void setCursor(byte col, byte row)
+        {
+            var row_offsets = new int[] { 0x00, 0x40, 0x14, 0x54 };
+
+            /*if (row >= _numlines)
+            {
+                row = _numlines - 1;    // we count rows starting w/0
+            }
+            */
+
+            command((byte)(LCD_SETDDRAMADDR | (col + row_offsets[row])));
+        }
+
+        // Turn the display on/off (quickly)
+        public void DisplayOff()
+        {
+            DisplayControl &= ~LCD_DISPLAYON;
+            command((byte)(LCDDisplayControl | DisplayControl));
+        }
+        public void DisplayOn()
+        {
+            DisplayControl |= LCD_DISPLAYON;
+            command((byte)(LCDDisplayControl | DisplayControl));
+        }
+
+        // Turns the underline cursor on/off
+        public void noCursor()
+        {
+            DisplayControl &= ~LCD_CURSORON;
+            command((byte)(LCDDisplayControl | DisplayControl));
+        }
+        public void cursor()
+        {
+            DisplayControl |= LCD_CURSORON;
+            command((byte)(LCDDisplayControl | DisplayControl));
+        }
+
+        // Turn on and off the blinking cursor
+        public void noBlink()
+        {
+            DisplayControl &= ~LCD_BLINKON;
+            command((byte)(LCDDisplayControl | DisplayControl));
+        }
+        public void blink()
+        {
+            DisplayControl |= LCD_BLINKON;
+            command((byte)(LCDDisplayControl | DisplayControl));
+        }
+
+        // These commands scroll the display without changing the RAM
+        public void scrollDisplayLeft()
+        {
+            command(LCD_CURSORSHIFT | LCD_DISPLAYMOVE | LCD_MOVELEFT);
+        }
+        public void scrollDisplayRight()
+        {
+            command(LCD_CURSORSHIFT | LCD_DISPLAYMOVE | LCD_MOVERIGHT);
+        }
+
+        // This is for text that flows Left to Right
+        public void leftToRight()
+        {
+            DisplayMode |= LCD_ENTRYLEFT;
+            command((byte)(LCD_ENTRYMODESET | DisplayMode));
+        }
+
+        // This is for text that flows Right to Left
+        public void rightToLeft()
+        {
+            DisplayMode &= ~LCD_ENTRYLEFT;
+            command((byte)(LCD_ENTRYMODESET | DisplayMode));
+        }
+
+        // This will 'right justify' text from the cursor
+        public void autoscroll()
+        {
+            DisplayMode |= LCD_ENTRYSHIFTINCREMENT;
+            command((byte)(LCD_ENTRYMODESET | DisplayMode));
+        }
+
+        // This will 'left justify' text from the cursor
+        public void noAutoscroll()
+        {
+            DisplayMode &= ~LCD_ENTRYSHIFTINCREMENT;
+            command((byte)(LCD_ENTRYMODESET | DisplayMode));
+        }
+
+        // Allows us to fill the first 8 CGRAM locations
+        // with custom characters
+        public void createChar(byte location, byte[] charmap)
+        {
+            location &= 0x7; // we only have 8 locations 0-7
+            command((byte)(LCD_SETCGRAMADDR | (location << 3)));
+            for (int i = 0; i < 8; i++)
+            {
+                write(charmap[i]);
+            }
+        }
+
+        public void WriteLine(string Text)
+        {
+            if (_currentrow >= _rows)
+            {
+                //let's do shift
+                for (int i = 1; i < _rows; i++)
+                {
+                    buffer[i - 1] = buffer[i];
+                    setCursor(0, (byte)(i - 1));
+                    write(buffer[i - 1].Substring(0, _cols));
+                }
+                _currentrow = _rows - 1;
+            }
+            buffer[_currentrow] = Text + cleanline;
+            setCursor(0, (byte)_currentrow);
+            var cuts = buffer[_currentrow].Substring(0, _cols);
+            write(cuts);
+            _currentrow++;
         }
     }
 }

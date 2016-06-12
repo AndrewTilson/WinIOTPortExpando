@@ -121,32 +121,27 @@ namespace WinIOTPortExpando.MCPBase
         {
             foreach (Register register in registers)
             {
-                //Get state of pins on the register
-                i2cPortExpander.WriteRead(new byte[] { register.PORT_EXPANDER_GPIO_REGISTER_ADDRESS }, i2CReadBuffer);
-
                 foreach (Pin pin in pins.Where(p => p.register == register.register && p.IO == PinOpt.IO.output))
                 {
                     switch (enable)
                     {
                         case false:
                             {
-                                bitMask = (byte)(i2CReadBuffer[0] ^ (byte)pin.pin);
+                                bitMask = (byte)(register.olatRegister ^ (byte)pin.pin);
                                 register.olatRegister &= bitMask;
                                 break;
                             }
                         case true:
                             {
-                                bitMask = (byte)(i2CReadBuffer[0] ^ (byte)pin.pin);
+                                bitMask = (byte)(register.olatRegister ^ (byte)pin.pin);
                                 register.olatRegister |= bitMask;
                                 break;
                             }
                     }
                 }
-                //Only if the pin state is different than what was read from the i2cdevice then do a write.
-                if (i2CReadBuffer[0] != register.olatRegister)
-                {
-                    i2cPortExpander.Write(new byte[] { register.PORT_EXPANDER_OLAT_REGISTER_ADDRESS, register.olatRegister });
-                }
+
+                //write out to register value and store that into gpio now that it was updated.
+                i2cPortExpander.Write(new byte[] { register.PORT_EXPANDER_OLAT_REGISTER_ADDRESS, register.olatRegister });
             }
         }
 
@@ -169,19 +164,6 @@ namespace WinIOTPortExpando.MCPBase
                 registers[1].gpioRegister = getpinvals(registers[1]);
             }
             return (i2CReadBuffer[0] & (byte)pin.pin) != (byte)pin.pin;
-        }
-
-        //can be used if needed to manually manipulate the GPIO register for when attaching devices to the MCP expander.
-        public void writegpio(PinOpt.register register, byte value)
-        {
-            if (register == PinOpt.register.A)
-            {
-                i2cPortExpander.WriteRead(new byte[] { registers[0].PORT_EXPANDER_GPIO_REGISTER_ADDRESS }, i2CReadBuffer);
-            }
-            else if (register == PinOpt.register.B)
-            {
-                i2cPortExpander.WriteRead(new byte[] { registers[1].PORT_EXPANDER_GPIO_REGISTER_ADDRESS }, i2CReadBuffer);
-            }
         }
 
         //read 8 bit value from specified register and update the registers local value
