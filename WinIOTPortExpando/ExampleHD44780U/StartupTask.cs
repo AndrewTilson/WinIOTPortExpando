@@ -20,7 +20,7 @@ namespace ExampleHD44780U
             try
             {
                 //create port expander IC and its proper pins for the screen
-                MCP23008 register = new MCP23008(0x20, 26);
+                MCP23008 register = new MCP23008(0x27, 26);
                 List<Pin> allpins = new List<Pin>();
 
                 Pin rs = new Pin { register = PinOpt.register.A, pin = PinOpt.pin.GP0, IO = PinOpt.IO.output };

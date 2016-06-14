@@ -31,6 +31,7 @@ namespace WinIOTPortExpando.MCPBase
                 PORT_EXPANDER_INTCAP_REGISTER_ADDRESS = 0x10,
                 PORT_EXPANDER_GPIO_REGISTER_ADDRESS = 0x12,
                 PORT_EXPANDER_OLAT_REGISTER_ADDRESS = 0x14,
+                PORT_EXPANDER_IOCON_REGISTER_ADDRESS = 0x0A,
                 register = PinOpt.register.A
             });
             registers.Add(new Register {
@@ -44,6 +45,7 @@ namespace WinIOTPortExpando.MCPBase
                 PORT_EXPANDER_INTCAP_REGISTER_ADDRESS = 0x11,
                 PORT_EXPANDER_GPIO_REGISTER_ADDRESS = 0x13,
                 PORT_EXPANDER_OLAT_REGISTER_ADDRESS = 0x15,
+                PORT_EXPANDER_IOCON_REGISTER_ADDRESS = 0x0B,
                 register = PinOpt.register.B
             });
 
@@ -79,11 +81,12 @@ namespace WinIOTPortExpando.MCPBase
                 PORT_EXPANDER_INTCAP_REGISTER_ADDRESS = 0x08,
                 PORT_EXPANDER_GPIO_REGISTER_ADDRESS = 0x09,
                 PORT_EXPANDER_OLAT_REGISTER_ADDRESS = 0x0A,
+                PORT_EXPANDER_IOCON_REGISTER_ADDRESS = 0x05,
                 register = PinOpt.register.A
             });
 
             //call initialization of base inherited class to initialize the i2c device
-            var task = MCPinit(0x05);
+            var task = MCPinit();
             task.Wait();
         }
 

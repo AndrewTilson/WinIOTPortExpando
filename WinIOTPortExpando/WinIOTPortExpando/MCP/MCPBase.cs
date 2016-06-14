@@ -20,7 +20,6 @@ namespace WinIOTPortExpando.MCPBase
     {
         internal const string I2C_CONTROLLER_NAME = "I2C1"; //specific to RPi2 or RPi3
         internal byte PORT_EXPANDER_I2C_ADDRESS; //7-bit I2C address of the port expander
-        internal byte PORT_EXPANDER_IOCON_REGISTER_ADDRESS; // I/O Expander Configruation Register
         internal GPIOAccess.PinIn interuptA; //input pin to recive interupt signal
         internal GPIOAccess.PinIn interuptB; //input pin to recive interupt signal
         internal List<Pin> MCPpins = new List<Pin>(); //list of all pins on the device
@@ -29,10 +28,10 @@ namespace WinIOTPortExpando.MCPBase
 
         internal byte[] i2CReadBuffer = new byte[0xff];
         internal byte bitMask;
-        private byte ioconRegister; //local copy of the I2C Port Expander IOCON register
+
 
         //0x0A is the address for mcp23017. Leaving it default and allowing mcp23008 to overide.
-        internal async Task MCPinit(byte PORT_EXPANDER_IOCON_REGISTER_ADDRESS = 0x0A)
+        internal async Task MCPinit()
         {
             //initialize I2C communications
             try
@@ -48,12 +47,6 @@ namespace WinIOTPortExpando.MCPBase
             {
                 throw new TypeInitializationException("Unable to initialize communication to the device", e);
             }
-
-            //configure device for open - drain output on the interrupt pin
-            i2cPortExpander.Write(new byte[] { PORT_EXPANDER_IOCON_REGISTER_ADDRESS, 0x00 });
-
-            i2cPortExpander.WriteRead(new byte[] { PORT_EXPANDER_IOCON_REGISTER_ADDRESS }, i2CReadBuffer);
-            ioconRegister = i2CReadBuffer[0];
 
             //set IO, pullup, and interupt status for pins
             foreach (Register register in registers)
@@ -202,7 +195,7 @@ namespace WinIOTPortExpando.MCPBase
             {
                 tempregister.intfRegister = i2CReadBuffer[0];
 
-                //Debug.WriteLine("Register" + tempregister.register + " " + tempregister.intfRegister.ToString());
+                Debug.WriteLine("Register" + tempregister.register + " " + tempregister.intfRegister.ToString());
 
                 //check each pin that is in the register that was interrupt and if it was the cause of the interrupt trigger its onchange action
                 foreach (Pin pin in MCPpins.Where(p => p.register == thisregister))
