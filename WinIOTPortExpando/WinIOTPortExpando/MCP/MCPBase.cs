@@ -63,8 +63,8 @@ namespace WinIOTPortExpando.MCPBase
                             bitMask = (byte)(register.iodirRegister |= (byte)pin.pin);
                             register.iodirRegister &= bitMask;
 
-                            bitMask = (byte)(0x00 ^ (byte)pin.pin);
-                            register.intconRegister |= bitMask;
+                            bitMask = (byte)(0xFF ^ (byte)pin.pin);
+                            register.intconRegister &= bitMask;
 
                             bitMask = (byte)(0x00 ^ (byte)pin.pin);
                             register.gpintRegister |= bitMask;
@@ -74,8 +74,8 @@ namespace WinIOTPortExpando.MCPBase
                             bitMask = (byte)(register.iodirRegister ^ (byte)pin.pin);
                             register.iodirRegister &= bitMask;
 
-                            bitMask = (byte)(0xFF ^ (byte)pin.pin);
-                            register.intconRegister &= bitMask;
+                            bitMask = (byte)(0x00 ^ (byte)pin.pin);
+                            register.intconRegister |= bitMask;
 
                             bitMask = (byte)(0xFF ^ (byte)pin.pin);
                             register.gpintRegister &= bitMask;
@@ -171,7 +171,6 @@ namespace WinIOTPortExpando.MCPBase
         {
             Register tempregister = new Register();
             PinOpt.register thisregister = new PinOpt.register();
-            byte previousestate = new byte();
 
             //get register need for the interrupt pin that triggered the interrupt
             if (sender.PinNumber == interuptA.Device_PIN)
@@ -185,22 +184,18 @@ namespace WinIOTPortExpando.MCPBase
                 thisregister = PinOpt.register.B;
             }
 
-            //get state of register before interrupt
-            i2cPortExpander.WriteRead(new byte[] { tempregister.PORT_EXPANDER_INTCAP_REGISTER_ADDRESS }, i2CReadBuffer);
-            previousestate = i2CReadBuffer[0];
-
             //get the pin that triggered the interrupt
             i2cPortExpander.WriteRead(new byte[] { tempregister.PORT_EXPANDER_INTF_REGISTER_ADDRESS }, i2CReadBuffer);
             if (i2CReadBuffer[0] != tempregister.intfRegister)
             {
                 tempregister.intfRegister = i2CReadBuffer[0];
 
-                Debug.WriteLine("Register" + tempregister.register + " " + tempregister.intfRegister.ToString());
+                //Debug.WriteLine("Register" + tempregister.register + " " + tempregister.intfRegister.ToString());
 
                 //check each pin that is in the register that was interrupt and if it was the cause of the interrupt trigger its onchange action
                 foreach (Pin pin in MCPpins.Where(p => p.register == thisregister))
                 {
-                    if ((previousestate & (byte)pin.pin) != 0)
+                    if ((tempregister.intfRegister == (byte)pin.pin))
                     {
                         pin.TriggerChange();
                     }

@@ -42,6 +42,7 @@ namespace WinIOTPortExpando.MCPBase
         public PinOpt.IO IO { get; set; }
         public register register { get; set; }
         public bool interupt { get; set; }
+        public bool state { get; set; }
 
         public delegate void MyEventHandler(Pin m);
         public event MyEventHandler OnChange;
